@@ -125,6 +125,8 @@ if __name__ == '__main__':
     parser.add_argument('-warm', type=int, default=1, help='warm up training phase')
     parser.add_argument('-lr', type=float, default=0.1, help='initial learning rate')
     parser.add_argument('-resume', action='store_true', default=False, help='resume training')
+    parser.add_argument('-quan', action='store_true', default=False, help='Quantization Aware')
+    parser.add_argument('-MRE', action='store_true', default=False, help='MRE Aware')
     args = parser.parse_args()
 
     net = get_network(args)
@@ -157,10 +159,16 @@ if __name__ == '__main__':
         if not recent_folder:
             raise Exception('no recent folder were found')
 
-        checkpoint_path = os.path.join(settings.CHECKPOINT_PATH, args.net, recent_folder)
+        checkpoint_path = (os.path.join(settings.CHECKPOINT_PATH, args.net,'quan', recent_folder)
+                            if args.quan
+                            else  os.path.join(settings.CHECKPOINT_PATH, args.net, recent_folder)
+                           )
 
     else:
-        checkpoint_path = os.path.join(settings.CHECKPOINT_PATH, args.net, settings.TIME_NOW)
+        checkpoint_path = (os.path.join(settings.CHECKPOINT_PATH, args.net,'quan', settings.TIME_NOW)
+                            if args.quan
+                            else  os.path.join(settings.CHECKPOINT_PATH, args.net, settings.TIME_NOW)
+                           )
 
     #use tensorboard
     if not os.path.exists(settings.LOG_DIR):

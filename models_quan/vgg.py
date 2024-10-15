@@ -30,7 +30,7 @@ class VGG(nn.Module):
             nn.Dropout(),
             quan.QuantizedLinearLayer(in_features=4096, out_features=4096, process_fn=nn.ReLU(inplace=True)),
             nn.Dropout(),
-            quan.QuantizedLinearLayer(in_features=4096, out_features=num_class, process_fn=None)
+            nn.Linear(4096, num_class)
         )
 
     def forward(self, x):
@@ -39,6 +39,7 @@ class VGG(nn.Module):
         output = self.classifier(output)
 
         return output
+
 
 def make_layers(cfg, batch_norm=False):
     layers = []
@@ -50,9 +51,6 @@ def make_layers(cfg, batch_norm=False):
             continue
 
         layers += [quan.QuantizedConvLayer(in_channels=input_channel, out_channels=l, kernel_size=3, padding=1, process_fn=None)]
-
-        if batch_norm:
-            layers += [nn.BatchNorm2d(l)]
 
         layers += [nn.ReLU(inplace=True)]
         input_channel = l

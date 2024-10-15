@@ -29,20 +29,20 @@ class QuantizedConvLayer(nn.Module):
         super(QuantizedConvLayer, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
         self.relu = nn.ReLU()
-        # 注意：需要根据模型的实际定义添加BN层或者其他需要融合的层
-        # self.bn = nn.BatchNorm2d(out_channels)
+        self.process_fn = process_fn  # 实例化额外处理函数
+        # 5-bit 量化权重
+        self.conv.weight.data = Quantize5bit.apply(self.conv.weight.data)
 
     def forward(self, x):
         # 4-bit 量化输入
         x = Quantize4bit.apply(x)
-        # 5-bit 量化权重
-        self.conv.weight.data = Quantize5bit.apply(self.conv.weight.data)
 
         # 执行卷积操作
         x = self.conv(x)
 
         # 可以在这里加上其它操作,如激活和BN等
-        x = self.process_fn(x)
+        #if self.process_fn is not None:
+        #    x = self.process_fn(x)
 
         x = Quantize4bit.apply(x)  # 下一层的输入必须是4-bit无符号量化
 
@@ -58,20 +58,20 @@ class QuantizedLinearLayer(nn.Module):
         """
         super(QuantizedLinearLayer, self).__init__()
         self.linear = nn.Linear(in_features, out_features)
-        self.process_fn = process_fn()  # 实例化激活函数
+        self.process_fn = process_fn  # 实例化额外处理函数
+        # 5-bit 量化权重
+        self.linear.weight.data = Quantize5bit.apply(self.linear.weight.data)
 
     def forward(self, x):
         # 4-bit 量化输入
         x = Quantize4bit.apply(x)
 
-        # 5-bit 量化权重
-        self.linear.weight.data = Quantize5bit.apply(self.linear.weight.data)
-
         # 执行线性层操作
         x = self.linear(x)
 
         # 应用传入的激活函数
-        x = self.process_fn(x)
+        #if self.process_fn is not None:
+        #    x = self.process_fn(x)
 
         # 4-bit 量化输出给下一层使用
         x = Quantize4bit.apply(x)
