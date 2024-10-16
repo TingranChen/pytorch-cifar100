@@ -176,7 +176,7 @@ class InceptionD(nn.Module):
         #x -> 1x1 -> 3x3(downsample)
         branch3x3 = self.branch3x3(x)
 
-        #x -> 1x1 -> 1x7 -> 7x1 -> 3x3 (downsample)
+        #x -> 1x1 -> 1x7 -> 7x1 -> 3x3 (downsample):
         branch7x7 = self.branch7x7(x)
 
         #x -> avgpool (downsample)
