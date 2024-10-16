@@ -11,6 +11,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import utils_mine.quantization as quan
 
 
 class LinearBottleNeck(nn.Module):
@@ -19,16 +20,16 @@ class LinearBottleNeck(nn.Module):
         super().__init__()
 
         self.residual = nn.Sequential(
-            nn.Conv2d(in_channels, in_channels * t, 1),
-            nn.BatchNorm2d(in_channels * t),
+            quan.QuantizedConvLayer(in_channels=in_channels, out_channels=in_channels * t, kernel_size=1, process_fn=nn.BatchNorm2d(in_channels * t)),
+            #nn.BatchNorm2d(in_channels * t),
             nn.ReLU6(inplace=True),
 
-            nn.Conv2d(in_channels * t, in_channels * t, 3, stride=stride, padding=1, groups=in_channels * t),
-            nn.BatchNorm2d(in_channels * t),
+            quan.QuantizedConvLayer(in_channels=in_channels * t, out_channels=in_channels * t, kernel_size=3, stride=stride, padding=1, groups=in_channels * t, process_fn=nn.BatchNorm2d(in_channels * t)),
+            #nn.BatchNorm2d(in_channels * t),
             nn.ReLU6(inplace=True),
 
-            nn.Conv2d(in_channels * t, out_channels, 1),
-            nn.BatchNorm2d(out_channels)
+            quan.QuantizedConvLayer(in_channels=in_channels * t, out_channels=out_channels, kernel_size=1, process_fn=nn.BatchNorm2d(out_channels))
+            #nn.BatchNorm2d(out_channels)
         )
 
         self.stride = stride
@@ -50,8 +51,8 @@ class MobileNetV2(nn.Module):
         super().__init__()
 
         self.pre = nn.Sequential(
-            nn.Conv2d(3, 32, 1, padding=1),
-            nn.BatchNorm2d(32),
+            quan.QuantizedConvLayer(in_channels=3, out_channels=32, kernel_size=1, padding=1,process_fn=nn.BatchNorm2d(32)),
+            #nn.BatchNorm2d(32),
             nn.ReLU6(inplace=True)
         )
 
@@ -64,12 +65,12 @@ class MobileNetV2(nn.Module):
         self.stage7 = LinearBottleNeck(160, 320, 1, 6)
 
         self.conv1 = nn.Sequential(
-            nn.Conv2d(320, 1280, 1),
-            nn.BatchNorm2d(1280),
+            quan.QuantizedConvLayer(in_channels=320, out_channels=1280, kernel_size=1,process_fn=nn.BatchNorm2d(1280)),
+            #nn.BatchNorm2d(1280),
             nn.ReLU6(inplace=True)
         )
 
-        self.conv2 = nn.Conv2d(1280, class_num, 1)
+        self.conv2 = quan.QuantizedConvLayer(in_channels=1280, out_channels=class_num, kernel_size=1)
 
     def forward(self, x):
         x = self.pre(x)

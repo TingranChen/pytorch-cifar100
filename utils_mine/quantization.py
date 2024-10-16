@@ -25,9 +25,9 @@ class Quantize5bit(torch.autograd.Function):
 
 
 class QuantizedConvLayer(nn.Module):
-    def __init__(self, process_fn, in_channels, out_channels, kernel_size, stride=1, padding=0, ):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, groups=1, bias=False, process_fn=None):
         super(QuantizedConvLayer, self).__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
+        self.conv = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=padding, groups=groups, bias=bias)
         self.relu = nn.ReLU()
         self.process_fn = process_fn  # 实例化额外处理函数
         # 5-bit 量化权重
@@ -50,14 +50,14 @@ class QuantizedConvLayer(nn.Module):
 
 
 class QuantizedLinearLayer(nn.Module):
-    def __init__(self, in_features, out_features, process_fn):
+    def __init__(self, in_features, out_features, process_fn, bias=False):
         """
         :param in_features: 输入特征数
         :param out_features: 输出特征数
         :param activation_fn: 选择激活函数，默认使用 ReLU
         """
         super(QuantizedLinearLayer, self).__init__()
-        self.linear = nn.Linear(in_features, out_features)
+        self.linear = nn.Linear(in_features=in_features, out_features=out_features, bias=bias)
         self.process_fn = process_fn  # 实例化额外处理函数
         # 5-bit 量化权重
         self.linear.weight.data = Quantize5bit.apply(self.linear.weight.data)

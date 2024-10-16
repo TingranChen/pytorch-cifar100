@@ -9,19 +9,19 @@
 
 import torch
 import torch.nn as nn
-
+import utils_mine.quantization as quan
 
 class BasicConv2d(nn.Module):
 
     def __init__(self, input_channels, output_channels, **kwargs):
         super().__init__()
-        self.conv = nn.Conv2d(input_channels, output_channels, bias=False, **kwargs)
-        self.bn = nn.BatchNorm2d(output_channels)
+        self.conv = quan.QuantizedConvLayer(in_channels=input_channels, out_channels=output_channels, bias=False, process_fn=nn.BatchNorm2d(output_channels), **kwargs)
+        #self.bn = nn.BatchNorm2d(output_channels)
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         x = self.conv(x)
-        x = self.bn(x)
+        #x = self.bn(x)
         x = self.relu(x)
 
         return x

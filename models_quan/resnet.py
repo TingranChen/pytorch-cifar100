@@ -10,6 +10,7 @@
 
 import torch
 import torch.nn as nn
+import utils_mine.quantization as quan
 
 class BasicBlock(nn.Module):
     """Basic Block for resnet 18 and resnet 34
@@ -27,11 +28,11 @@ class BasicBlock(nn.Module):
 
         #residual function
         self.residual_function = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
+            quan.QuantizedConvLayer(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride=stride, padding=1, bias=False,process_fn=nn.BatchNorm2d(out_channels)),
+            #nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels * BasicBlock.expansion, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels * BasicBlock.expansion)
+            quan.QuantizedConvLayer(in_channels=out_channels, out_channels=out_channels * BasicBlock.expansion, kernel_size=3, padding=1, bias=False, process_fn = nn.BatchNorm2d(out_channels * BasicBlock.expansion))
+            #nn.BatchNorm2d(out_channels * BasicBlock.expansion)
         )
 
         #shortcut
@@ -41,14 +42,15 @@ class BasicBlock(nn.Module):
         #use 1*1 convolution to match the dimension
         if stride != 1 or in_channels != BasicBlock.expansion * out_channels:
             self.shortcut = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels * BasicBlock.expansion, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(out_channels * BasicBlock.expansion)
+                quan.QuantizedConvLayer(in_channels=in_channels, out_channels=out_channels * BasicBlock.expansion, kernel_size=3,
+                          padding=1, bias=False, process_fn=nn.BatchNorm2d(out_channels * BasicBlock.expansion)),
+                # nn.BatchNorm2d(out_channels * BasicBlock.expansion)
             )
 
     def forward(self, x):
         return nn.ReLU(inplace=True)(self.residual_function(x) + self.shortcut(x))
 
-class BottleNeck(nn.Module):z
+class BottleNeck(nn.Module):
     """Residual block for resnet over 50 layers
 
     """
@@ -56,22 +58,22 @@ class BottleNeck(nn.Module):z
     def __init__(self, in_channels, out_channels, stride=1):
         super().__init__()
         self.residual_function = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
-            nn.BatchNorm2d(out_channels),
+            quan.QuantizedConvLayer(in_channels = in_channels, out_channels = out_channels, kernel_size=1, bias=False, process_fn=nn.BatchNorm2d(out_channels)),
+            #nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, stride=stride, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
+            quan.QuantizedConvLayer(in_channels = out_channels, out_channels = out_channels, stride=stride, kernel_size=3, padding=1, bias=False, process_fn=nn.BatchNorm2d(out_channels)),
+            #nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels * BottleNeck.expansion, kernel_size=1, bias=False),
-            nn.BatchNorm2d(out_channels * BottleNeck.expansion),
+            quan.QuantizedConvLayer(in_channels = out_channels, out_channels = out_channels * BottleNeck.expansion, kernel_size=1, bias=False, process_fn=nn.BatchNorm2d(out_channels * BottleNeck.expansion))
+            #nn.BatchNorm2d(out_channels * BottleNeck.expansion),
         )
 
         self.shortcut = nn.Sequential()
 
         if stride != 1 or in_channels != out_channels * BottleNeck.expansion:
             self.shortcut = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels * BottleNeck.expansion, stride=stride, kernel_size=1, bias=False),
-                nn.BatchNorm2d(out_channels * BottleNeck.expansion)
+                quan.QuantizedConvLayer(in_channels = out_channels, out_channels = out_channels * BottleNeck.expansion, stride=stride, kernel_size=1, bias=False, process_fn=nn.BatchNorm2d(out_channels * BottleNeck.expansion))
+                #nn.BatchNorm2d(out_channels * BottleNeck.expansion)
             )
 
     def forward(self, x):
@@ -85,8 +87,8 @@ class ResNet(nn.Module):
         self.in_channels = 64
 
         self.conv1 = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(64),
+            quan.QuantizedConvLayer(in_channels=3, out_channels=64, kernel_size=3, padding=1, bias=False, process_fn=nn.BatchNorm2d(64)),
+            #nn.BatchNorm2d(64),
             nn.ReLU(inplace=True))
         #we use a different inputsize than the original paper
         #so conv2_x's stride is 1
