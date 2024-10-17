@@ -157,6 +157,144 @@ def get_network(args):
             print('the network name you have entered is not supported yet')
             sys.exit()
 
+    elif args.mre == True:
+        if args.net == 'vgg16':
+            from models_mre.vgg import vgg16_bn
+            net = vgg16_bn()
+        elif args.net == 'vgg13':
+            from models_mre.vgg import vgg13_bn
+            net = vgg13_bn()
+        elif args.net == 'vgg11':
+            from models_mre.vgg import vgg11_bn
+            net = vgg11_bn()
+        elif args.net == 'vgg19':
+            from models_mre.vgg import vgg19_bn
+            net = vgg19_bn()
+        elif args.net == 'densenet121':
+            from models_mre.densenet import densenet121
+            net = densenet121()
+        elif args.net == 'densenet161':
+            from models_mre.densenet import densenet161
+            net = densenet161()
+        elif args.net == 'densenet169':
+            from models_mre.densenet import densenet169
+            net = densenet169()
+        elif args.net == 'densenet201':
+            from models_mre.densenet import densenet201
+            net = densenet201()
+        elif args.net == 'googlenet':
+            from models_mre.googlenet import googlenet
+            net = googlenet()
+        elif args.net == 'inceptionv3':
+            from models_mre.inceptionv3 import inceptionv3
+            net = inceptionv3()
+        elif args.net == 'inceptionv4':
+            from models_mre.inceptionv4 import inceptionv4
+            net = inceptionv4()
+        elif args.net == 'inceptionresnetv2':
+            from models_mre.inceptionv4 import inception_resnet_v2
+            net = inception_resnet_v2()
+        elif args.net == 'xception':
+            from models_mre.xception import xception
+            net = xception()
+        elif args.net == 'resnet18':
+            from models_mre.resnet import resnet18
+            net = resnet18()
+        elif args.net == 'resnet34':
+            from models_mre.resnet import resnet34
+            net = resnet34()
+        elif args.net == 'resnet50':
+            from models_mre.resnet import resnet50
+            net = resnet50()
+        elif args.net == 'resnet101':
+            from models_mre.resnet import resnet101
+            net = resnet101()
+        elif args.net == 'resnet152':
+            from models_mre.resnet import resnet152
+            net = resnet152()
+        elif args.net == 'preactresnet18':
+            from models_mre.preactresnet import preactresnet18
+            net = preactresnet18()
+        elif args.net == 'preactresnet34':
+            from models_mre.preactresnet import preactresnet34
+            net = preactresnet34()
+        elif args.net == 'preactresnet50':
+            from models_mre.preactresnet import preactresnet50
+            net = preactresnet50()
+        elif args.net == 'preactresnet101':
+            from models_mre.preactresnet import preactresnet101
+            net = preactresnet101()
+        elif args.net == 'preactresnet152':
+            from models_mre.preactresnet import preactresnet152
+            net = preactresnet152()
+        elif args.net == 'resnext50':
+            from models_mre.resnext import resnext50
+            net = resnext50()
+        elif args.net == 'resnext101':
+            from models_mre.resnext import resnext101
+            net = resnext101()
+        elif args.net == 'resnext152':
+            from models_mre.resnext import resnext152
+            net = resnext152()
+        elif args.net == 'shufflenet':
+            from models_mre.shufflenet import shufflenet
+            net = shufflenet()
+        elif args.net == 'shufflenetv2':
+            from models_mre.shufflenetv2 import shufflenetv2
+            net = shufflenetv2()
+        elif args.net == 'squeezenet':
+            from models_mre.squeezenet import squeezenet
+            net = squeezenet()
+        elif args.net == 'mobilenet':
+            from models_mre.mobilenet import mobilenet
+            net = mobilenet()
+        elif args.net == 'mobilenetv2':
+            from models_mre.mobilenetv2 import mobilenetv2
+            net = mobilenetv2()
+        elif args.net == 'nasnet':
+            from models_mre.nasnet import nasnet
+            net = nasnet()
+        elif args.net == 'attention56':
+            from models_mre.attention import attention56
+            net = attention56()
+        elif args.net == 'attention92':
+            from models_mre.attention import attention92
+            net = attention92()
+        elif args.net == 'seresnet18':
+            from models_mre.senet import seresnet18
+            net = seresnet18()
+        elif args.net == 'seresnet34':
+            from models_mre.senet import seresnet34
+            net = seresnet34()
+        elif args.net == 'seresnet50':
+            from models_mre.senet import seresnet50
+            net = seresnet50()
+        elif args.net == 'seresnet101':
+            from models_mre.senet import seresnet101
+            net = seresnet101()
+        elif args.net == 'seresnet152':
+            from models_mre.senet import seresnet152
+            net = seresnet152()
+        elif args.net == 'wideresnet':
+            from models_mre.wideresidual import wideresnet
+            net = wideresnet()
+        elif args.net == 'stochasticdepth18':
+            from models_mre.stochasticdepth import stochastic_depth_resnet18
+            net = stochastic_depth_resnet18()
+        elif args.net == 'stochasticdepth34':
+            from models_mre.stochasticdepth import stochastic_depth_resnet34
+            net = stochastic_depth_resnet34()
+        elif args.net == 'stochasticdepth50':
+            from models_mre.stochasticdepth import stochastic_depth_resnet50
+            net = stochastic_depth_resnet50()
+        elif args.net == 'stochasticdepth101':
+            from models_mre.stochasticdepth import stochastic_depth_resnet101
+            net = stochastic_depth_resnet101()
+
+        else:
+            print('the network name you have entered is not supported yet')
+            sys.exit()
+
     else:
         if args.net == 'vgg16':
             from models_quan.vgg import vgg16_bn
