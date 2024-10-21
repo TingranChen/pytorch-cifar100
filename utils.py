@@ -19,16 +19,16 @@ from torch.utils.data import DataLoader
 def get_network(args):
     """ return given network
     """
-    if args.quan==False:
+    if args.throu==False:
         if args.net == 'vgg16':
-            from models_throughput.vgg import vgg16_model
-            net = vgg16_bn()
-        elif args.net == 'vgg13':
-            from models.vgg import vgg13_bn
-            net = vgg13_bn()
-        elif args.net == 'stochasticdepth101':
-            from models.stochasticdepth import stochastic_depth_resnet101
-            net = stochastic_depth_resnet101()
+            from models_throughput.vgg import vgg_model
+            net = vgg_model()
+        elif args.net == 'mobilenetv2':
+            from models_throughput.mobilenetv2 import mobilenetv2
+            net = mobilenetv2()
+        elif args.net == 'inceptionv3':
+            from models_throughput.inceptionv3 import inceptionv3
+            net = inceptionv3()
 
         else:
             print('the network name you have entered is not supported yet')

@@ -10,6 +10,7 @@ cfg = {
     'E': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M']
 }
 
+
 class DelayExpansionLayer(nn.Module):
     def __init__(self, delay_data):
         super().__init__()
@@ -19,23 +20,34 @@ class DelayExpansionLayer(nn.Module):
         """将延时膨胀数据转换为映射表。"""
         return {round(row['data'], 6): row['delay expension'] for _, row in delay_data.iterrows()}
 
-    def get_delay_value(self, mean_value):
-        """根据均值查找对应的延时膨胀参数，若找不到则返回1.0。"""
+    def get_closest_delay_value(self, mean_value):
+        """查找距离最近的延时膨胀参数。"""
         rounded_mean = round(mean_value, 6)
-        return self.delay_map.get(rounded_mean, 1.0)
+
+        # 如果直接找到对应的值，直接返回
+        if rounded_mean in self.delay_map:
+            return self.delay_map[rounded_mean]
+
+        # 否则计算与所有键的距离，找出最近的键
+        closest_key = min(self.delay_map.keys(), key=lambda k: abs(k - rounded_mean))
+        return self.delay_map[closest_key]
 
     def forward(self, layer_output, in_channels, out_channels):
         """计算每层的膨胀参数矩阵，并按通道合并后乘以 (in_channels * out_channels)。"""
         _, channels, height, width = layer_output.shape
         delay_matrix = torch.zeros((channels, height, width), device=layer_output.device)
 
+        # 遍历每个通道，计算通道的平均值并映射为延时膨胀参数
         for c in range(channels):
             channel_mean = layer_output[:, c, :, :].mean().item()
-            delay_value = self.get_delay_value(channel_mean)
+            delay_value = self.get_closest_delay_value(channel_mean)
             delay_matrix[c, :, :] = delay_value
 
+        # 对所有通道的膨胀矩阵取最大值，得到合并后的膨胀矩阵
         merged_matrix = delay_matrix.max(dim=0).values
+
         merged_matrix *= in_channels * out_channels  # 按元素乘以 (in_channels * out_channels)
+        merged_matrix /= (32 * 16)  # 按元素除以 (CIM 核固定的输入输出并行度)
         return merged_matrix
 
 class VGG(nn.Module):
@@ -63,7 +75,10 @@ class VGG(nn.Module):
                 out_channels = layer.out_channels
                 in_channels = layer.in_channels  # 更新输入通道数
                 delay_matrix = self.delay_layer(x, in_channels, out_channels)
+                print(delay_matrix)
                 all_layers_delay_matrices.append(delay_matrix)
+
+        x = x.view(x.size(0), -1)
 
         for layer in self.classifier:
             x = layer(x)
@@ -71,10 +86,10 @@ class VGG(nn.Module):
                 out_channels = layer.out_channels
                 in_channels = layer.in_channels  # 更新输入通道数
                 delay_matrix = self.delay_layer(x, in_channels, out_channels)
+                print(delay_matrix)
                 all_layers_delay_matrices.append(delay_matrix)
 
-        x = x.view(x.size(0), -1)
-        x = self.classifier(x)
+        #x = self.classifier(x)
         return x, all_layers_delay_matrices
 
 def make_layers(cfg, batch_norm=False):
@@ -93,7 +108,16 @@ def make_layers(cfg, batch_norm=False):
     return nn.Sequential(*layers)
 
 # delay extension table
-data = [
+
+def vgg_model(model_type='D', batch_norm=True):
+    """
+    创建VGG模型的通用函数，支持不同VGG配置。
+    :param model_type: 模型类型，例如 'A', 'B', 'D', 'E'
+    :param delay_data: 延时膨胀参数数据
+    :param batch_norm: 是否使用批归一化
+    :return: VGG模型实例
+    """
+    data = [
     [0.0, 0.056598642],
     [0.0666667, 0.205962435],
     [0.1333333, 0.312138982],
@@ -111,20 +135,7 @@ data = [
     [0.9333333, 1.072683293],
     [1.0, 1.192973781]
 ]
-def vgg_model(model_type='D', delay_data=data, batch_norm=True):
-    """
-    创建VGG模型的通用函数，支持不同VGG配置。
-    :param model_type: 模型类型，例如 'A', 'B', 'D', 'E'
-    :param delay_data: 延时膨胀参数数据
-    :param batch_norm: 是否使用批归一化
-    :return: VGG模型实例
-    """
+    # 将数据转换为 DataFrame
+    delay_data = pd.DataFrame(data, columns=["data", "delay expension"])
     return VGG(make_layers(cfg[model_type], batch_norm=batch_norm), delay_data)
-
-
-# 将数据转换为 DataFrame
-delay_data = pd.DataFrame(data, columns=["data", "delay expension"])
-
-# 创建VGG16模型并加载延时膨胀数据
-model = vgg_model('D', delay_data)
 
