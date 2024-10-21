@@ -26,20 +26,20 @@ class TensorGaussianErrorWithMRE:
         tensor_with_error = tensor * (1 + error)
 
         # 计算相对误差并保留为张量
-        relative_error = torch.abs(error).mean()  # 保持为张量
-        self.errors.append(relative_error)  # 将张量添加到错误列表
+        #relative_error = torch.abs(error).mean()  # 保持为张量
+        #self.errors.append(relative_error)  # 将张量添加到错误列表
 
         # 将错误列表的张量拼接为单个张量
-        errors_tensor = torch.stack(self.errors)
+        #errors_tensor = torch.stack(self.errors)
 
         # 计算当前 MRE
-        current_mre = errors_tensor.mean()  # 保持为张量
+        #current_mre = errors_tensor.mean()  # 保持为张量
 
         # 打印时再转换为标量
-        print(f"当前MRE: {current_mre.item():.2f}%")  # 仅在这里使用 .item()
+        #print(f"当前MRE: {current_mre.item():.2f}%")  # 仅在这里使用 .item()
 
         # 动态调整标准差
-        self.adjust_std_dev(current_mre)
+        #self.adjust_std_dev(current_mre)
 
         return tensor_with_error
 
@@ -51,10 +51,9 @@ class TensorGaussianErrorWithMRE:
         target_mre_tensor = torch.tensor(self.target_mre, device=current_mre.device)
 
         # 比较当前MRE与目标MRE，并调整标准差
-        if current_mre > target_mre_tensor:
+        if torch.all(current_mre > target_mre_tensor):
             self.std_dev *= 0.95  # 如果MRE过高，降低标准差
             print(f"标准差减小为: {self.std_dev:.6f}")
-        elif current_mre < target_mre_tensor:
+        else:
             self.std_dev *= 1.05  # 如果MRE过低，增加标准差
             print(f"标准差增大为: {self.std_dev:.6f}")
-

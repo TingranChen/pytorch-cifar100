@@ -11,7 +11,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import utils_mine.quantization as quan
+
+
 class LinearBottleNeck(nn.Module):
 
     def __init__(self, in_channels, out_channels, stride, t=6, class_num=100):
@@ -22,7 +23,7 @@ class LinearBottleNeck(nn.Module):
             nn.BatchNorm2d(in_channels * t),
             nn.ReLU6(inplace=True),
 
-            quan.QuantizedConvLayer(in_channels * t, in_channels * t, 3, stride=stride, padding=1, groups=in_channels * t),
+            nn.Conv2d(in_channels * t, in_channels * t, 3, stride=stride, padding=1, groups=in_channels * t),
             nn.BatchNorm2d(in_channels * t),
             nn.ReLU6(inplace=True),
 

@@ -21,6 +21,22 @@ def get_network(args):
     """
     if args.quan==False:
         if args.net == 'vgg16':
+            from models_throughput.vgg import vgg16_model
+            net = vgg16_bn()
+        elif args.net == 'vgg13':
+            from models.vgg import vgg13_bn
+            net = vgg13_bn()
+        elif args.net == 'stochasticdepth101':
+            from models.stochasticdepth import stochastic_depth_resnet101
+            net = stochastic_depth_resnet101()
+
+        else:
+            print('the network name you have entered is not supported yet')
+            sys.exit()
+
+
+    elif args.quan==False:
+        if args.net == 'vgg16':
             from models.vgg import vgg16_bn
             net = vgg16_bn()
         elif args.net == 'vgg13':

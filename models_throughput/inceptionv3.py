@@ -9,35 +9,19 @@
 
 import torch
 import torch.nn as nn
-import utils_mine.quantization as quan
-import utils_mine.mre as mre
 
-def add_error(tensor, std_dev):
-    # 使用张量形式的均值和标准差，确保与输入张量的设备一致
-    mean = torch.zeros(tensor.shape, device=tensor.device)
-    std = torch.full(tensor.shape, std_dev, device=tensor.device)
-
-    # 生成误差
-    error = torch.normal(mean, std)
-
-    # 计算误差后的张量
-    tensor_with_error = tensor * (1 + error)
-
-    return tensor_with_error
 
 class BasicConv2d(nn.Module):
 
     def __init__(self, input_channels, output_channels, **kwargs):
         super().__init__()
-        self.conv_mre = mre.TensorGaussianErrorWithMRE(target_mre=0.02, std_dev=0.02) # 创建mre误差管理类，目标MRE为2%
-        self.conv = quan.QuantizedConvLayer(in_channels=input_channels, out_channels=output_channels, bias=False, process_fn=nn.BatchNorm2d(output_channels), mre_fn=self.conv_mre.add_error, **kwargs)
-        #self.bn = nn.BatchNorm2d(output_channels)
+        self.conv = nn.Conv2d(input_channels, output_channels, bias=False, **kwargs)
+        self.bn = nn.BatchNorm2d(output_channels)
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         x = self.conv(x)
-        x = add_error(x, std_dev=0.02)
-        #x = self.bn(x)
+        x = self.bn(x)
         x = self.relu(x)
 
         return x
@@ -341,7 +325,6 @@ class InceptionV3(nn.Module):
         x = self.dropout(x)
         x = x.view(x.size(0), -1)
         x = self.linear(x)
-        x = add_error(x, std_dev=0.02)
         return x
 
 
