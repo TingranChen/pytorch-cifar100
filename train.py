@@ -127,7 +127,7 @@ if __name__ == '__main__':
     parser.add_argument('-resume', action='store_true', default=False, help='resume training')
     parser.add_argument('-quan', action='store_true', default=False, help='Quantization Aware')
     parser.add_argument('-mre', action='store_true', default=False, help='MRE Aware')
-    parser.add_argument('-throu', action='store_true', default=False, help='Throughput Exam')
+    parser.add_argument('-throu', action='store_true', default=True, help='Throughput Exam')
     args = parser.parse_args()
 
     net = get_network(args)

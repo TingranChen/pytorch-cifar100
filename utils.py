@@ -19,7 +19,7 @@ from torch.utils.data import DataLoader
 def get_network(args):
     """ return given network
     """
-    if args.throu==False:
+    if args.throu==True:
         if args.net == 'vgg16':
             from models_throughput.vgg import vgg_model
             net = vgg_model()
