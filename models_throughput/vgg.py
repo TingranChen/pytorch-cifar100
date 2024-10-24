@@ -1,8 +1,6 @@
-import torch
 import torch.nn as nn
 import pandas as pd
-import datetime
-import os
+import utils_mine.DelayExpansion as DEX
 
 # VGG 的配置参数
 cfg = {
@@ -11,68 +9,6 @@ cfg = {
     'D': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M'],
     'E': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M']
 }
-
-
-class DelayExpansionLayer(nn.Module):
-    def __init__(self, delay_data):
-        super().__init__()
-        self.delay_map = self._create_delay_map(delay_data)
-
-    def _create_delay_map(self, delay_data):
-        """将延时膨胀数据转换为映射表。"""
-        return {round(row['data'], 6): row['delay expension'] for _, row in delay_data.iterrows()}
-
-    def get_closest_delay_value(self, mean_value):
-        """查找距离最近的延时膨胀参数。"""
-        rounded_mean = round(mean_value, 6)
-
-        if rounded_mean in self.delay_map:
-            return self.delay_map[rounded_mean]
-
-        closest_key = min(self.delay_map.keys(), key=lambda k: abs(k - rounded_mean))
-        return self.delay_map[closest_key]
-
-    def forward(self, layer_output, in_channels, out_channels):
-        """计算每层的膨胀参数矩阵，并保存到Excel文件中。"""
-        batch_size, channels, height, width = layer_output.shape
-        if batch_size != 128:
-            return layer_output  # 如果batch_size不是128，直接返回
-
-        delay_matrix = torch.zeros((channels, height, width), device=layer_output.device)
-        for c in range(channels):
-            channel_mean = layer_output[:, c, :, :].mean().item()
-            delay_value = self.get_closest_delay_value(channel_mean)
-            delay_matrix[c, :, :] = delay_value
-
-        # 对通道进行最大值合并，得到二维的平均矩阵
-        average_matrix = delay_matrix.max(dim=0).values
-        average_matrix *= in_channels * out_channels
-        average_matrix /= (in_channels * 16 if in_channels <= 128 else 128 * 16)
-
-        # 执行延时膨胀计算并转换为 DataFrame
-        average_matrix_df = pd.DataFrame(average_matrix.cpu().numpy())
-
-        #确认初始路径存在
-        base_dir = "./output"
-        if not os.path.exists(base_dir):
-            os.makedirs(base_dir)  # 如果目录不存在则创建
-
-        # 定义初始 Excel 文件路径
-        base_path = "./output/average_matrix_1.xlsx"
-        excel_path = base_path
-
-        if not os.path.exists(excel_path):
-            with pd.ExcelWriter(excel_path, mode='w') as writer:
-                # 创建一个占位的空 DataFrame，并写入默认子表
-                pd.DataFrame().to_excel(writer, sheet_name='Placeholder')
-
-        # 使用 'a' 模式，追加新的子表，不会覆盖已有文件
-        with pd.ExcelWriter(excel_path, mode='a', if_sheet_exists='new') as writer:
-            sheet_name = f'Run_{in_channels},{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}'
-            average_matrix_df.to_excel(writer, sheet_name=sheet_name, index=False, header=False)
-
-        print(f"Average matrix of layer {in_channels} saved to {excel_path} in sheet '{sheet_name}'")
-        return average_matrix
 
 class VGG(nn.Module):
     def __init__(self, features, delay_data, num_classes=100):
@@ -87,7 +23,7 @@ class VGG(nn.Module):
             nn.Dropout(),
             nn.Linear(4096, num_classes)
         )
-        self.delay_layer = DelayExpansionLayer(delay_data)
+        self.delay_layer = DEX.DelayExpansionLayer(delay_data)
 
     def forward(self, x):
         all_layers_delay_matrices = []
@@ -98,17 +34,17 @@ class VGG(nn.Module):
             if isinstance(layer, nn.Conv2d):
                 out_channels = layer.out_channels
                 in_channels = layer.in_channels  # 更新输入通道数
-                delay_matrix = self.delay_layer(x, in_channels, out_channels)
+                delay_matrix = self.delay_layer(x, x.size(0), in_channels, out_channels)
                 all_layers_delay_matrices.append(delay_matrix)
 
         x = x.view(x.size(0), -1)
 
         for layer in self.classifier:
             x = layer(x)
-            if isinstance(layer, nn.Conv2d):
-                out_channels = layer.out_channels
-                in_channels = layer.in_channels  # 更新输入通道数
-                delay_matrix = self.delay_layer(x, in_channels, out_channels)
+            if isinstance(layer, nn.Linear):
+                out_channels = layer.out_features
+                in_channels = layer.in_features  # 更新输入通道数
+                delay_matrix = self.delay_layer(x, x.size(0) , in_channels, out_channels)
                 all_layers_delay_matrices.append(delay_matrix)
 
         #x = self.classifier(x)
