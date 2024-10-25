@@ -9,6 +9,8 @@
 
 import torch
 import torch.nn as nn
+import utils_mine.DelayExpansion as DEX
+import pandas as pd
 
 
 class BasicConv2d(nn.Module):
@@ -19,8 +21,34 @@ class BasicConv2d(nn.Module):
         self.bn = nn.BatchNorm2d(output_channels)
         self.relu = nn.ReLU(inplace=True)
 
+        data = [
+            [0.0, 0.056598642],
+            [0.0666667, 0.205962435],
+            [0.1333333, 0.312138982],
+            [0.2, 0.437158198],
+            [0.2666667, 0.319973934],
+            [0.3333333, 0.450264408],
+            [0.4, 0.559485637],
+            [0.4666667, 0.694916383],
+            [0.5333333, 0.562896787],
+            [0.6, 0.709107365],
+            [0.6666667, 0.811728286],
+            [0.7333333, 0.939352112],
+            [0.8, 0.818508719],
+            [0.8666667, 0.958645411],
+            [0.9333333, 1.072683293],
+            [1.0, 1.192973781]
+        ]
+        # 将数据转换为 DataFrame
+        delay_data = pd.DataFrame(data, columns=["data", "delay expension"])
+
+        if delay_data is not None:
+            self.delay_data = delay_data
+            self.delay_layer = DEX.DelayExpansionLayer(delay_data=self.delay_data)
+
     def forward(self, x):
         x = self.conv(x)
+        self.delay_layer(x, x.size(0), self.conv)
         x = self.bn(x)
         x = self.relu(x)
 
@@ -29,7 +57,7 @@ class BasicConv2d(nn.Module):
 #same naive inception module
 class InceptionA(nn.Module):
 
-    def __init__(self, input_channels, pool_features):
+    def __init__(self, input_channels, pool_features, delay_data=None):
         super().__init__()
         self.branch1x1 = BasicConv2d(input_channels, 64, kernel_size=1)
 
@@ -48,6 +76,10 @@ class InceptionA(nn.Module):
             nn.AvgPool2d(kernel_size=3, stride=1, padding=1),
             BasicConv2d(input_channels, pool_features, kernel_size=3, padding=1)
         )
+
+        if delay_data is not None:
+            self.delay_data = delay_data
+            self.delay_layer = DEX.DelayExpansionLayer(delay_data=self.delay_data)
 
     def forward(self, x):
 
@@ -72,7 +104,7 @@ class InceptionA(nn.Module):
 #Factorization into smaller convolutions
 class InceptionB(nn.Module):
 
-    def __init__(self, input_channels):
+    def __init__(self, input_channels, delay_data=None):
         super().__init__()
 
         self.branch3x3 = BasicConv2d(input_channels, 384, kernel_size=3, stride=2)
@@ -84,6 +116,10 @@ class InceptionB(nn.Module):
         )
 
         self.branchpool = nn.MaxPool2d(kernel_size=3, stride=2)
+
+        if delay_data is not None:
+            self.delay_data = delay_data
+            self.delay_layer = DEX.DelayExpansionLayer(delay_data=self.delay_data)
 
     def forward(self, x):
 
@@ -106,9 +142,13 @@ class InceptionB(nn.Module):
 
 #Factorizing Convolutions with Large Filter Size
 class InceptionC(nn.Module):
-    def __init__(self, input_channels, channels_7x7):
+    def __init__(self, input_channels, channels_7x7, delay_data=None):
         super().__init__()
         self.branch1x1 = BasicConv2d(input_channels, 192, kernel_size=1)
+
+        if delay_data is not None:
+            self.delay_data = delay_data
+            self.delay_layer = DEX.DelayExpansionLayer(delay_data=self.delay_data)
 
         c7 = channels_7x7
 
@@ -154,8 +194,12 @@ class InceptionC(nn.Module):
 
 class InceptionD(nn.Module):
 
-    def __init__(self, input_channels):
+    def __init__(self, input_channels, delay_data=None):
         super().__init__()
+
+        if delay_data is not None:
+            self.delay_data = delay_data
+            self.delay_layer = DEX.DelayExpansionLayer(delay_data=self.delay_data)
 
         self.branch3x3 = nn.Sequential(
             BasicConv2d(input_channels, 192, kernel_size=1),
@@ -189,7 +233,7 @@ class InceptionD(nn.Module):
 
 #same
 class InceptionE(nn.Module):
-    def __init__(self, input_channels):
+    def __init__(self, input_channels, delay_data=None):
         super().__init__()
         self.branch1x1 = BasicConv2d(input_channels, 320, kernel_size=1)
 
@@ -206,6 +250,10 @@ class InceptionE(nn.Module):
             nn.AvgPool2d(kernel_size=3, stride=1, padding=1),
             BasicConv2d(input_channels, 192, kernel_size=1)
         )
+
+        if delay_data is not None:
+            self.delay_data = delay_data
+            self.delay_layer = DEX.DelayExpansionLayer(delay_data=self.delay_data)
 
     def forward(self, x):
 
@@ -245,8 +293,9 @@ class InceptionE(nn.Module):
 
 class InceptionV3(nn.Module):
 
-    def __init__(self, num_classes=100):
+    def __init__(self, num_classes=100, delay_data=None):
         super().__init__()
+
         self.Conv2d_1a_3x3 = BasicConv2d(3, 32, kernel_size=3, padding=1)
         self.Conv2d_2a_3x3 = BasicConv2d(32, 32, kernel_size=3, padding=1)
         self.Conv2d_2b_3x3 = BasicConv2d(32, 64, kernel_size=3, padding=1)
@@ -276,6 +325,10 @@ class InceptionV3(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.dropout = nn.Dropout2d()
         self.linear = nn.Linear(2048, num_classes)
+
+        if delay_data is not None:
+            self.delay_data = delay_data
+            self.delay_layer = DEX.DelayExpansionLayer(delay_data=self.delay_data)
 
     def forward(self, x):
 
@@ -325,11 +378,39 @@ class InceptionV3(nn.Module):
         x = self.dropout(x)
         x = x.view(x.size(0), -1)
         x = self.linear(x)
+        self.delay_layer(x, x.size(0), self.linear)
         return x
 
 
 def inceptionv3():
-    return InceptionV3()
+    """
+    创建VGG模型的通用函数，支持不同VGG配置。
+    :param model_type: 模型类型，例如 'A', 'B', 'D', 'E'
+    :param delay_data: 延时膨胀参数数据
+    :param batch_norm: 是否使用批归一化
+    :return: VGG模型实例
+    """
+    data = [
+        [0.0, 0.056598642],
+        [0.0666667, 0.205962435],
+        [0.1333333, 0.312138982],
+        [0.2, 0.437158198],
+        [0.2666667, 0.319973934],
+        [0.3333333, 0.450264408],
+        [0.4, 0.559485637],
+        [0.4666667, 0.694916383],
+        [0.5333333, 0.562896787],
+        [0.6, 0.709107365],
+        [0.6666667, 0.811728286],
+        [0.7333333, 0.939352112],
+        [0.8, 0.818508719],
+        [0.8666667, 0.958645411],
+        [0.9333333, 1.072683293],
+        [1.0, 1.192973781]
+    ]
+    # 将数据转换为 DataFrame
+    delay_data = pd.DataFrame(data, columns=["data", "delay expension"])
+    return InceptionV3(delay_data=delay_data)
 
 
 
