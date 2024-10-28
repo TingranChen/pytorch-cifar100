@@ -23,12 +23,16 @@ class DelayExpansionLayer(nn.Module):
         closest_key = min(self.delay_map.keys(), key=lambda k: abs(k - rounded_mean))
         return self.delay_map[closest_key]
 
-    def forward(self, layer_output, batch_size, in_channels, out_channels, kernel_size=3):
+    def forward(self, layer_output, batch_size, layer):
         """计算每层的膨胀参数矩阵，并保存到Excel文件中。"""
         # 获取输入的形状，并判断是否需要处理
         if layer_output.dim() == 4:
             batch_size, channels, height, width = layer_output.shape
-            if batch_size != 128:
+            in_channels = layer.in_channels
+            out_channels = layer.out_channels
+            kernel_size = layer.kernel_size
+
+            if batch_size < 16:
                 return layer_output  # 如果batch_size不是128，直接返回
 
             delay_matrix = torch.zeros((channels, height, width), device=layer_output.device)
@@ -46,7 +50,7 @@ class DelayExpansionLayer(nn.Module):
             #    average_matrix /= 128 * 16
 
             #CIM repeat times for a single element of the mean feature
-            compute_repeat = in_channels * out_channels * kernel_size * kernel_size
+            compute_repeat = in_channels * out_channels * kernel_size[0] * kernel_size[1]
             if in_channels <= 128 :
                 compute_repeat/= in_channels * 16
             else :
@@ -55,8 +59,12 @@ class DelayExpansionLayer(nn.Module):
             print(f"Total compute Repeat is {compute_repeat} for each delay_matrix element of this layer")
 
         elif layer_output.dim() == 2:
-            if batch_size != 128:
+            if batch_size < 16:
                 return layer_output  # 如果batch_size不是128，直接返回
+
+            in_channels = layer.in_features
+            out_channels = layer.in_features
+
             delay_matrix = torch.zeros((batch_size, out_channels), device=layer_output.device)
             channel_mean = layer_output.mean().item()
             delay_value = self.get_closest_delay_value(channel_mean)
@@ -72,6 +80,7 @@ class DelayExpansionLayer(nn.Module):
             compute_repeat /= 128 * 16 # fused parallelism of CIM
 
             print(f"Total compute Repeat is {compute_repeat} for each delay_matrix element of this layer")
+
         else:
             print(f"Not a PyTorch Layer!")
 

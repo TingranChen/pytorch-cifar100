@@ -34,7 +34,7 @@ class VGG(nn.Module):
             if isinstance(layer, nn.Conv2d):
                 out_channels = layer.out_channels
                 in_channels = layer.in_channels  # 更新输入通道数
-                delay_matrix = self.delay_layer(x, x.size(0), in_channels, out_channels)
+                delay_matrix = self.delay_layer(x, x.size(0), layer=layer)
                 all_layers_delay_matrices.append(delay_matrix)
 
         x = x.view(x.size(0), -1)
@@ -44,7 +44,7 @@ class VGG(nn.Module):
             if isinstance(layer, nn.Linear):
                 out_channels = layer.out_features
                 in_channels = layer.in_features  # 更新输入通道数
-                delay_matrix = self.delay_layer(x, x.size(0) , in_channels, out_channels)
+                delay_matrix = self.delay_layer(x, x.size(0) ,layer=layer)
                 all_layers_delay_matrices.append(delay_matrix)
 
         #x = self.classifier(x)
