@@ -47,8 +47,11 @@ def print_weight_statistics(total_weight_count, weight_distribution):
         print(f"Value: {value:.2f}, Count: {count}")
 
 # 示例：使用模型.pth文件路径
-#pth_file = "./checkpoint/vgg16/quan/Tuesday_15_October_2024_14h_44m_56s/vgg16-10-regular.pth"
-#pth_file = "./checkpoint/mobilenetv2/quan/Wednesday_16_October_2024_18h_41m_55s/mobilenetv2-10-regular.pth"
-pth_file = "./checkpoint/inceptionv3/quan/"
+#pth_file = "./checkpoint/vgg16/quan/Wednesday_30_October_2024_11h_46m_00s/vgg16-1-regular.pth"
+#pth_file = "./checkpoint/mobilenetv2/quan/Wednesday_30_October_2024_11h_15m_55s/mobilenetv2-1-regular.pth"
+#pth_file = "./checkpoint/inceptionv3/quan/Saturday_26_October_2024_10h_12m_28s/inceptionv3-1-regular.pth"
+
+pth_file = "./checkpoint/mobilenetv2/"
+
 total_count, distribution = analyze_weights(pth_file)
 print_weight_statistics(total_count, distribution)
