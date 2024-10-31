@@ -51,7 +51,8 @@ def print_weight_statistics(total_weight_count, weight_distribution):
 #pth_file = "./checkpoint/mobilenetv2/quan/Wednesday_30_October_2024_11h_15m_55s/mobilenetv2-1-regular.pth"
 #pth_file = "./checkpoint/inceptionv3/quan/Saturday_26_October_2024_10h_12m_28s/inceptionv3-1-regular.pth"
 
-pth_file = "./checkpoint/mobilenetv2/"
+#pth_file = "./checkpoint/mobilenetv2/"
+pth_file = "./checkpoint/vgg16/Thursday_31_October_2024_14h_35m_28s/vgg16-1-regular.pth"
 
 total_count, distribution = analyze_weights(pth_file)
 print_weight_statistics(total_count, distribution)

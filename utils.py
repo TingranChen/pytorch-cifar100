@@ -19,7 +19,22 @@ from torch.utils.data import DataLoader
 def get_network(args):
     """ return given network
     """
-    if args.throu==True:
+    if args.modeltest==True:
+        if args.net == 'vgg16':
+            from breath_model.vgg import vgg16_bn
+            net = vgg16_bn()
+        elif args.net == 'mobilenetv2':
+            from breath_model.mobilenetv2 import mobilenetv2
+            net = mobilenetv2()
+        elif args.net == 'inceptionv3':
+            from breath_model.inceptionv3 import inceptionv3
+            net = inceptionv3()
+
+        else:
+            print('the network name you have entered is not supported yet')
+            sys.exit()
+
+    elif args.throu==True:
         if args.net == 'vgg16':
             from models_throughput.vgg import vgg_model
             net = vgg_model()
