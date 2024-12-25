@@ -26,7 +26,6 @@ class VGG(nn.Module):
         self.delay_layer = DEX.DelayExpansionLayer(delay_data)
 
     def forward(self, x):
-        all_layers_delay_matrices = []
         in_channels = 3  # 初始输入通道数
 
         for layer in self.features:
@@ -34,8 +33,7 @@ class VGG(nn.Module):
             if isinstance(layer, nn.Conv2d):
                 out_channels = layer.out_channels
                 in_channels = layer.in_channels  # 更新输入通道数
-                delay_matrix = self.delay_layer(x, x.size(0), layer=layer)
-                all_layers_delay_matrices.append(delay_matrix)
+                delay_matrix = self.delay_layer(layer_output=x, batch_size=x.size(0), layer=layer)
 
         x = x.view(x.size(0), -1)
 
@@ -45,7 +43,6 @@ class VGG(nn.Module):
                 out_channels = layer.out_features
                 in_channels = layer.in_features  # 更新输入通道数
                 delay_matrix = self.delay_layer(x, x.size(0) ,layer=layer)
-                all_layers_delay_matrices.append(delay_matrix)
 
         #x = self.classifier(x)
         return x

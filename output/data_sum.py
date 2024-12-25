@@ -3,9 +3,9 @@ import pandas as pd
 net = 'mobile'
 
 # 定义 Excel 文件的路径
-excel_path = "./average_matrix_vgg.xlsx"  # 请确保路径正确
+#excel_path = "./average_matrix_vgg.xlsx"  # 请确保路径正确
 #excel_path = "./average_matrix_mobilenet.xlsx"  # 请确保路径正确
-#excel_path = "./average_matrix_inception.xlsx"  # 请确保路径正确
+excel_path = "./average_matrix_inception.xlsx"  # 请确保路径正确
 
 # 打开 Excel 文件并读取所有子表的数据
 excel_data = pd.ExcelFile(excel_path)
@@ -14,7 +14,7 @@ excel_data = pd.ExcelFile(excel_path)
 total_sum = 0
 total_count = 0
 i = 0
-vgg16_repeat = [36, 36, 72, 72, 144, 288, 288, 576, 1152, 1152, 1152, 1152, 1152, 0.25, 2, 2]
+vgg16_repeat = [9, 9, 18, 18, 18, 36, 72, 72, 144, 288, 288, 288, 288, 32, 2, 2]
 mobilenetv2_repeat = [2,2,18,1,6,54,1.5,9,91.125,1.6875,9.0,91.125,2.25,12.0,162.0,3.0,12.0,162,3,12,162,6,24,648,12,24,648,12,24,648,12,24,648,18,36,1458,27,36,1458,27,36,1458,45,75,4050,75,75,4050,75,75,4050,150,200,62.5]
 inceptionv3_repeat = [18,18,36,5,108,6,4.5,100,6,54,54,27,8,6,100,8,54,54,72,9,6.75,100,9,54,54,81,486,9,54,54,72,48,56,84,48,56,56,56,84,72,72,60,87.5,105,60,87.5,87.5,87.5,105,72,72,60,87.5,105,60,87.5,105,60,87.5,87.5,87.5,105,72,72,72,126,126,72,126,126,126,126,72,72,270,72,126,126,162,200,240,216,216,280,756,216,216,120,320,384,216,216,448,756,216,216,192,1]
 
@@ -28,27 +28,27 @@ for i, sheet_name in enumerate(excel_data.sheet_names):
 
     # 累加所有有效数字的和
     sheet_sum = numeric_data.sum().sum()
-    total_sum += sheet_sum * vgg16_repeat[i]
+    #total_sum += sheet_sum * vgg16_repeat[i]
     #total_sum += sheet_sum * mobilenetv2_repeat[i]
-    #total_sum += sheet_sum * inceptionv3_repeat[i]
+    total_sum += sheet_sum * inceptionv3_repeat[i]
     
     # 统计所有有效数字的总数
     sheet_count = numeric_data.count().sum()
-    total_count += sheet_count*vgg16_repeat[i]
+    #total_count += sheet_count*vgg16_repeat[i]
     #total_count += sheet_count*mobilenetv2_repeat[i]
-    #total_count += sheet_count*inceptionv3_repeat[i]
+    total_count += sheet_count*inceptionv3_repeat[i]
 
-    print(f"文件 {i} 中所有相对延迟膨胀参数累加和为：{sheet_sum},加权后为{sheet_sum*vgg16_repeat[i]}")
-    print(f"文件 {i} 中有效数字对应的总操作重复数为：{sheet_count},加权后为{sheet_count*vgg16_repeat[i]}")
-    print(f"文件 {i} 中所有元素的延迟膨胀的平均值为：{sheet_sum/sheet_count}")
+    # print(f"文件 {i} 中所有相对延迟膨胀参数累加和为：{sheet_sum},加权后为{sheet_sum*vgg16_repeat[i]}")
+    # print(f"文件 {i} 中有效数字对应的总操作重复数为：{sheet_count},加权后为{sheet_count*vgg16_repeat[i]}")
+    # print(f"文件 {i} 中所有元素的延迟膨胀的平均值为：{sheet_sum/sheet_count}")
 
     # print(f"文件 {i} 中所有相对延迟膨胀参数累加和为：{sheet_sum},加权后为{sheet_sum*mobilenetv2_repeat[i]}")
     # print(f"文件 {i} 中有效数字对应的总操作重复数为：{sheet_count},加权后为{sheet_count*mobilenetv2_repeat[i]}")
     # print(f"文件 {i} 中所有元素的延迟膨胀的平均值为：{sheet_sum/sheet_count}")
 
-    # print(f"文件 {i} 中所有相对延迟膨胀参数累加和为：{sheet_sum},加权后为{sheet_sum*inceptionv3_repeat[i]}")
-    # print(f"文件 {i} 中有效数字对应的总操作重复数为：{sheet_count},加权后为{sheet_count*inceptionv3_repeat[i]}")
-    # print(f"文件 {i} 中所有元素的延迟膨胀的平均值为：{sheet_sum/sheet_count}")
+    print(f"文件 {i} 中所有相对延迟膨胀参数累加和为：{sheet_sum},加权后为{sheet_sum*inceptionv3_repeat[i]}")
+    print(f"文件 {i} 中有效数字对应的总操作重复数为：{sheet_count},加权后为{sheet_count*inceptionv3_repeat[i]}")
+    print(f"文件 {i} 中所有元素的延迟膨胀的平均值为：{sheet_sum/sheet_count}")
 
     # 记序
     i+=1

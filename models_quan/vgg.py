@@ -50,8 +50,8 @@ def make_layers(cfg, batch_norm=False):
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
             continue
 
-        layers += [quan.QuantizedConvLayer(in_channels=input_channel, out_channels=l, kernel_size=3, padding=1, process_fn=nn.BatchNorm2d(l))]
-
+        layers += [quan.QuantizedConvLayer(in_channels=input_channel, out_channels=l, kernel_size=3, padding=1)]
+        nn.BatchNorm2d(l)
         layers += [nn.ReLU(inplace=True)]
         input_channel = l
 

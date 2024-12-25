@@ -11,9 +11,39 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import pandas as pd
+import utils_mine.DelayExpansion as DEX  # 假设你有这个模块
 
 #"""The Attention Module is built by pre-activation Residual Unit [11] with the
 #number of channels in each stage is the same as ResNet [10]."""
+
+
+class DelayExpansionConv2d(nn.Conv2d):
+    def __init__(self, delay_layer, in_channels, out_channels, kernel_size, stride=1,
+                 padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros'):
+        super(DelayExpansionConv2d, self).__init__(
+            in_channels, out_channels, kernel_size, stride, padding, dilation,
+            groups, bias, padding_mode)
+        self.delay_layer = delay_layer
+
+    def forward(self, input):
+        output = super(DelayExpansionConv2d, self).forward(input)
+        batch_size = output.size(0)
+        if output.dim() == 4:
+            self.delay_layer(output, batch_size, self)
+        return output
+
+class DelayExpansionLinear(nn.Linear):
+    def __init__(self, delay_layer, in_features, out_features, bias=True):
+        super(DelayExpansionLinear, self).__init__(in_features, out_features, bias)
+        self.delay_layer = delay_layer
+
+    def forward(self, input):
+        output = super(DelayExpansionLinear, self).forward(input)
+        batch_size = output.size(0)
+        if output.dim() == 2:
+            self.delay_layer(output, batch_size, self)
+        return output
 
 class PreActResidualUnit(nn.Module):
     """PreAct Residual Unit
@@ -22,31 +52,26 @@ class PreActResidualUnit(nn.Module):
         out_channels: residual unit output channel numebr
         stride: stride of residual unit when stride = 2, downsample the featuremap
     """
-
-    def __init__(self, in_channels, out_channels, stride):
+    def __init__(self, delay_layer, in_channels, out_channels, stride):
         super().__init__()
-
         bottleneck_channels = int(out_channels / 4)
         self.residual_function = nn.Sequential(
             #1x1 conv
             nn.BatchNorm2d(in_channels),
             nn.ReLU(inplace=True),
-            nn.Conv2d(in_channels, bottleneck_channels, 1, stride),
-
+            DelayExpansionConv2d(delay_layer, in_channels, bottleneck_channels, 1, stride),
             #3x3 conv
             nn.BatchNorm2d(bottleneck_channels),
             nn.ReLU(inplace=True),
-            nn.Conv2d(bottleneck_channels, bottleneck_channels, 3, padding=1),
-
+            DelayExpansionConv2d(delay_layer, bottleneck_channels, bottleneck_channels, 3, padding=1),
             #1x1 conv
             nn.BatchNorm2d(bottleneck_channels),
             nn.ReLU(inplace=True),
-            nn.Conv2d(bottleneck_channels, out_channels, 1)
+            DelayExpansionConv2d(delay_layer, bottleneck_channels, out_channels, 1)
         )
-
         self.shortcut = nn.Sequential()
         if stride != 2 or (in_channels != out_channels):
-            self.shortcut = nn.Conv2d(in_channels, out_channels, 1, stride=stride)
+            self.shortcut = DelayExpansionConv2d(delay_layer, in_channels, out_channels, 1, stride=stride)
 
     def forward(self, x):
 
@@ -56,8 +81,7 @@ class PreActResidualUnit(nn.Module):
         return res + shortcut
 
 class AttentionModule1(nn.Module):
-
-    def __init__(self, in_channels, out_channels, p=1, t=2, r=1):
+    def __init__(self, delay_layer, in_channels, out_channels, p=1, t=2, r=1):
         super().__init__()
         #"""The hyperparameter p denotes the number of preprocessing Residual
         #Units before splitting into trunk branch and mask branch. t denotes
@@ -65,32 +89,32 @@ class AttentionModule1(nn.Module):
         #Residual Units between adjacent pooling layer in the mask branch."""
         assert in_channels == out_channels
 
-        self.pre = self._make_residual(in_channels, out_channels, p)
-        self.trunk = self._make_residual(in_channels, out_channels, t)
-        self.soft_resdown1 = self._make_residual(in_channels, out_channels, r)
-        self.soft_resdown2 = self._make_residual(in_channels, out_channels, r)
-        self.soft_resdown3 = self._make_residual(in_channels, out_channels, r)
-        self.soft_resdown4 = self._make_residual(in_channels, out_channels, r)
+        self.pre = self._make_residual(delay_layer, in_channels, out_channels, p)
+        self.trunk = self._make_residual(delay_layer, in_channels, out_channels, t)
+        self.soft_resdown1 = self._make_residual(delay_layer, in_channels, out_channels, r)
+        self.soft_resdown2 = self._make_residual(delay_layer, in_channels, out_channels, r)
+        self.soft_resdown3 = self._make_residual(delay_layer, in_channels, out_channels, r)
+        self.soft_resdown4 = self._make_residual(delay_layer, in_channels, out_channels, r)
 
-        self.soft_resup1 = self._make_residual(in_channels, out_channels, r)
-        self.soft_resup2 = self._make_residual(in_channels, out_channels, r)
-        self.soft_resup3 = self._make_residual(in_channels, out_channels, r)
-        self.soft_resup4 = self._make_residual(in_channels, out_channels, r)
+        self.soft_resup1 = self._make_residual(delay_layer, in_channels, out_channels, r)
+        self.soft_resup2 = self._make_residual(delay_layer, in_channels, out_channels, r)
+        self.soft_resup3 = self._make_residual(delay_layer, in_channels, out_channels, r)
+        self.soft_resup4 = self._make_residual(delay_layer, in_channels, out_channels, r)
 
-        self.shortcut_short = PreActResidualUnit(in_channels, out_channels, 1)
-        self.shortcut_long = PreActResidualUnit(in_channels, out_channels, 1)
+        self.shortcut_short = PreActResidualUnit(delay_layer, in_channels, out_channels, 1)
+        self.shortcut_long = PreActResidualUnit(delay_layer, in_channels, out_channels, 1)
 
         self.sigmoid = nn.Sequential(
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=1),
+            DelayExpansionConv2d(delay_layer, out_channels, out_channels, kernel_size=1),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=1),
+            DelayExpansionConv2d(delay_layer, out_channels, out_channels, kernel_size=1),
             nn.Sigmoid()
         )
 
-        self.last = self._make_residual(in_channels, out_channels, p)
+        self.last = self._make_residual(delay_layer, in_channels, out_channels, p)
 
     def forward(self, x):
         ###We make the size of the smallest output map in each mask branch 7*7 to be consistent
@@ -145,17 +169,15 @@ class AttentionModule1(nn.Module):
 
         return x
 
-    def _make_residual(self, in_channels, out_channels, p):
-
+    def _make_residual(self, delay_layer, in_channels, out_channels, p):
         layers = []
         for _ in range(p):
-            layers.append(PreActResidualUnit(in_channels, out_channels, 1))
-
+            layers.append(PreActResidualUnit(delay_layer, in_channels, out_channels, 1))
         return nn.Sequential(*layers)
 
 class AttentionModule2(nn.Module):
 
-    def __init__(self, in_channels, out_channels, p=1, t=2, r=1):
+    def __init__(self, delay_layer, in_channels, out_channels, p=1, t=2, r=1):
         super().__init__()
         #"""The hyperparameter p denotes the number of preprocessing Residual
         #Units before splitting into trunk branch and mask branch. t denotes
@@ -163,29 +185,29 @@ class AttentionModule2(nn.Module):
         #Residual Units between adjacent pooling layer in the mask branch."""
         assert in_channels == out_channels
 
-        self.pre = self._make_residual(in_channels, out_channels, p)
-        self.trunk = self._make_residual(in_channels, out_channels, t)
-        self.soft_resdown1 = self._make_residual(in_channels, out_channels, r)
-        self.soft_resdown2 = self._make_residual(in_channels, out_channels, r)
-        self.soft_resdown3 = self._make_residual(in_channels, out_channels, r)
+        self.pre = self._make_residual(delay_layer, in_channels, out_channels, p)
+        self.trunk = self._make_residual(delay_layer, in_channels, out_channels, t)
+        self.soft_resdown1 = self._make_residual(delay_layer, in_channels, out_channels, r)
+        self.soft_resdown2 = self._make_residual(delay_layer, in_channels, out_channels, r)
+        self.soft_resdown3 = self._make_residual(delay_layer, in_channels, out_channels, r)
 
-        self.soft_resup1 = self._make_residual(in_channels, out_channels, r)
-        self.soft_resup2 = self._make_residual(in_channels, out_channels, r)
-        self.soft_resup3 = self._make_residual(in_channels, out_channels, r)
+        self.soft_resup1 = self._make_residual(delay_layer, in_channels, out_channels, r)
+        self.soft_resup2 = self._make_residual(delay_layer, in_channels, out_channels, r)
+        self.soft_resup3 = self._make_residual(delay_layer, in_channels, out_channels, r)
 
-        self.shortcut = PreActResidualUnit(in_channels, out_channels, 1)
+        self.shortcut = PreActResidualUnit(delay_layer, in_channels, out_channels, 1)
 
         self.sigmoid = nn.Sequential(
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=1),
+            DelayExpansionConv2d(delay_layer, out_channels, out_channels, kernel_size=1),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=1),
+            DelayExpansionConv2d(delay_layer, out_channels, out_channels, kernel_size=1),
             nn.Sigmoid()
         )
 
-        self.last = self._make_residual(in_channels, out_channels, p)
+        self.last = self._make_residual(delay_layer, in_channels, out_channels, p)
 
     def forward(self, x):
         x = self.pre(x)
@@ -224,42 +246,42 @@ class AttentionModule2(nn.Module):
 
         return x
 
-    def _make_residual(self, in_channels, out_channels, p):
+    def _make_residual(self, delay_layer, in_channels, out_channels, p):
 
         layers = []
         for _ in range(p):
-            layers.append(PreActResidualUnit(in_channels, out_channels, 1))
+            layers.append(PreActResidualUnit(delay_layer, in_channels, out_channels, 1))
 
         return nn.Sequential(*layers)
 
 class AttentionModule3(nn.Module):
 
-    def __init__(self, in_channels, out_channels, p=1, t=2, r=1):
+    def __init__(self, delay_layer, in_channels, out_channels, p=1, t=2, r=1):
         super().__init__()
 
         assert in_channels == out_channels
 
-        self.pre = self._make_residual(in_channels, out_channels, p)
-        self.trunk = self._make_residual(in_channels, out_channels, t)
-        self.soft_resdown1 = self._make_residual(in_channels, out_channels, r)
-        self.soft_resdown2 = self._make_residual(in_channels, out_channels, r)
+        self.pre = self._make_residual(delay_layer, in_channels, out_channels, p)
+        self.trunk = self._make_residual(delay_layer, in_channels, out_channels, t)
+        self.soft_resdown1 = self._make_residual(delay_layer, in_channels, out_channels, r)
+        self.soft_resdown2 = self._make_residual(delay_layer, in_channels, out_channels, r)
 
-        self.soft_resup1 = self._make_residual(in_channels, out_channels, r)
-        self.soft_resup2 = self._make_residual(in_channels, out_channels, r)
+        self.soft_resup1 = self._make_residual(delay_layer, in_channels, out_channels, r)
+        self.soft_resup2 = self._make_residual(delay_layer, in_channels, out_channels, r)
 
-        self.shortcut = PreActResidualUnit(in_channels, out_channels, 1)
+        self.shortcut = PreActResidualUnit(delay_layer, in_channels, out_channels, 1)
 
         self.sigmoid = nn.Sequential(
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=1),
+            DelayExpansionConv2d(delay_layer, out_channels, out_channels, kernel_size=1),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=1),
+            DelayExpansionConv2d(delay_layer, out_channels, out_channels, kernel_size=1),
             nn.Sigmoid()
         )
 
-        self.last = self._make_residual(in_channels, out_channels, p)
+        self.last = self._make_residual(delay_layer, in_channels, out_channels, p)
 
     def forward(self, x):
         x = self.pre(x)
@@ -285,39 +307,38 @@ class AttentionModule3(nn.Module):
 
         return x
 
-    def _make_residual(self, in_channels, out_channels, p):
+    def _make_residual(self, delay_layer, in_channels, out_channels, p):
 
         layers = []
         for _ in range(p):
-            layers.append(PreActResidualUnit(in_channels, out_channels, 1))
+            layers.append(PreActResidualUnit(delay_layer, in_channels, out_channels, 1))
 
         return nn.Sequential(*layers)
-
 class Attention(nn.Module):
     """residual attention netowrk
     Args:
         block_num: attention module number for each stage
     """
 
-    def __init__(self, block_num, class_num=100):
-
+    def __init__(self, block_num, delay_data, class_num=100):
         super().__init__()
+        self.delay_layer = DEX.DelayExpansionLayer(delay_data)
         self.pre_conv = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1),
+            DelayExpansionConv2d(self.delay_layer, 3, 64, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True)
         )
 
-        self.stage1 = self._make_stage(64, 256, block_num[0], AttentionModule1)
-        self.stage2 = self._make_stage(256, 512, block_num[1], AttentionModule2)
-        self.stage3 = self._make_stage(512, 1024, block_num[2], AttentionModule3)
+        self.stage1 = self._make_stage(self.delay_layer, 64, 256, block_num[0], AttentionModule1)
+        self.stage2 = self._make_stage(self.delay_layer, 256, 512, block_num[1], AttentionModule2)
+        self.stage3 = self._make_stage(self.delay_layer, 512, 1024, block_num[2], AttentionModule3)
         self.stage4 = nn.Sequential(
-            PreActResidualUnit(1024, 2048, 2),
-            PreActResidualUnit(2048, 2048, 1),
-            PreActResidualUnit(2048, 2048, 1)
+            PreActResidualUnit(self.delay_layer, 1024, 2048, 2),
+            PreActResidualUnit(self.delay_layer, 2048, 2048, 1),
+            PreActResidualUnit(self.delay_layer, 2048, 2048, 1)
         )
         self.avg = nn.AdaptiveAvgPool2d(1)
-        self.linear = nn.Linear(2048, 100)
+        self.linear = DelayExpansionLinear(self.delay_layer, 2048, class_num)
 
     def forward(self, x):
         x = self.pre_conv(x)
@@ -331,19 +352,36 @@ class Attention(nn.Module):
 
         return x
 
-    def _make_stage(self, in_channels, out_channels, num, block):
-
+    def _make_stage(self, delay_layer, in_channels, out_channels, num, block):
         layers = []
-        layers.append(PreActResidualUnit(in_channels, out_channels, 2))
-
+        layers.append(PreActResidualUnit(delay_layer, in_channels, out_channels, 2))
         for _ in range(num):
-            layers.append(block(out_channels, out_channels))
-
+            layers.append(block(delay_layer, out_channels, out_channels))
         return nn.Sequential(*layers)
 
+data = [
+    [0.0, 0.056598642],
+    [0.0666667, 0.205962435],
+    [0.1333333, 0.312138982],
+    [0.2, 0.437158198],
+    [0.2666667, 0.319973934],
+    [0.3333333, 0.450264408],
+    [0.4, 0.559485637],
+    [0.4666667, 0.694916383],
+    [0.5333333, 0.562896787],
+    [0.6, 0.709107365],
+    [0.6666667, 0.811728286],
+    [0.7333333, 0.939352112],
+    [0.8, 0.818508719],
+    [0.8666667, 0.958645411],
+    [0.9333333, 1.072683293],
+    [1.0, 1.192973781]
+]
+# 将数据转换为 DataFrame
+delay_data = pd.DataFrame(data, columns=["data", "delay expension"])
 def attention56():
-    return Attention([1, 1, 1])
+    return Attention([1, 1, 1], delay_data)
 
 def attention92():
-    return Attention([1, 2, 3])
+    return Attention([1, 2, 3], delay_data)
 

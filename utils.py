@@ -36,14 +36,68 @@ def get_network(args):
 
     elif args.throu==True:
         if args.net == 'vgg16':
-            from models_throughput.vgg import vgg_model
-            net = vgg_model()
+            from models_throughput.vgg_throu import vgg16
+            net = vgg16()
         elif args.net == 'mobilenetv2':
             from models_throughput.mobilenetv2 import mobilenetv2
             net = mobilenetv2()
         elif args.net == 'inceptionv3':
             from models_throughput.inceptionv3 import inceptionv3
             net = inceptionv3()
+        elif args.net == 'shufflenetv2':
+            from models_throughput.shufflenetv2 import shufflenetv2
+            net = shufflenetv2()
+        elif args.net == 'densenet121':
+            from models_throughput.densenet import densenet121
+            net = densenet121()
+        elif args.net == 'densenet161':
+            from models_throughput.densenet import densenet161
+            net = densenet161()
+        elif args.net == 'densenet169':
+            from models_throughput.densenet import densenet169
+            net = densenet169()
+        elif args.net == 'densenet201':
+            from models_throughput.densenet import densenet201
+            net = densenet201()
+        elif args.net == 'resnet18':
+            from models_throughput.resnet import resnet18
+            net = resnet18()
+        elif args.net == 'resnet34':
+            from models_throughput.resnet import resnet34
+            net = resnet34()
+        elif args.net == 'resnet50':
+            from models_throughput.resnet import resnet50
+            net = resnet50()
+        elif args.net == 'resnet101':
+            from models_throughput.resnet import resnet101
+            net = resnet101()
+        elif args.net == 'resnet152':
+            from models_throughput.resnet import resnet152
+            net = resnet152()
+        elif args.net == 'attention56':
+            from models_throughput.attention import attention56
+            net = attention56()
+        elif args.net == 'attention92':
+            from models_throughput.attention import attention92
+            net = attention92()
+        elif args.net == 'squeezenet':
+            from models_throughput.squeezenet import squeezenet
+            net = squeezenet()
+        elif args.net == 'xception':
+            from models_throughput.xception import xception
+            net = xception()
+        elif args.net == 'stochasticdepth18':
+            from models_throughput.stochasticdepth import stochastic_depth_resnet18
+            net = stochastic_depth_resnet18()
+        elif args.net == 'stochasticdepth34':
+            from models_throughput.stochasticdepth import stochastic_depth_resnet34
+            net = stochastic_depth_resnet34()
+        elif args.net == 'stochasticdepth50':
+            from models_throughput.stochasticdepth import stochastic_depth_resnet50
+            net = stochastic_depth_resnet50()
+        elif args.net == 'stochasticdepth101':
+            from models_throughput.stochasticdepth import stochastic_depth_resnet101
+            net = stochastic_depth_resnet101()
 
         else:
             print('the network name you have entered is not supported yet')
@@ -183,6 +237,9 @@ def get_network(args):
         elif args.net == 'stochasticdepth101':
             from models.stochasticdepth import stochastic_depth_resnet101
             net = stochastic_depth_resnet101()
+        elif args.net == 'stochasticdepth_nojit':
+            from models.stochasticdepth_nojit import stochastic_depth_resnet34
+            net = stochastic_depth_resnet34()
 
         else:
             print('the network name you have entered is not supported yet')

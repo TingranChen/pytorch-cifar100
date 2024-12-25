@@ -97,9 +97,9 @@ def eval_training(epoch=0, tb=True):
         correct += preds.eq(labels).sum()
 
     finish = time.time()
-    if args.gpu:
-        print('GPU INFO.....')
-        print(torch.cuda.memory_summary(), end='')
+    #if args.gpu:
+    #    print('GPU INFO.....')
+    #    print(torch.cuda.memory_summary(), end='')
     print('Evaluating Network.....')
     print('Test set: Epoch: {}, Average loss: {:.4f}, Accuracy: {:.4f}, Time consumed:{:.2f}s'.format(
         epoch,
@@ -119,16 +119,16 @@ def eval_training(epoch=0, tb=True):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-net', type=str, default='vgg16', help='net type')
-    parser.add_argument('-gpu', action='store_true', default=True, help='use gpu or not')
-    parser.add_argument('-b', type=int, default=256, help='batch size for dataloader')
+    parser.add_argument('-net', type=str, default='stochasticdepth34', help='net type')
+    parser.add_argument('-gpu', action='store_true', default=False, help='use gpu or not')
+    parser.add_argument('-b', type=int, default=128, help='batch size for dataloader')
     parser.add_argument('-warm', type=int, default=1, help='warm up training phase')
     parser.add_argument('-lr', type=float, default=0.1, help='initial learning rate')
     parser.add_argument('-resume', action='store_true', default=False, help='resume training')
     parser.add_argument('-quan', action='store_true', default=False, help='Quantiization Aware')
     parser.add_argument('-mre', action='store_true', default=False, help='MRE Aware')
     parser.add_argument('-throu', action='store_true', default=False, help='Throughput Exam')
-    parser.add_argument('-modeltest', action='store_true', default=True, help='breath model test')
+    parser.add_argument('-modeltest', action='store_true', default=False, help='breath model test')
     args = parser.parse_args()
 
     net = get_network(args)
@@ -146,7 +146,7 @@ if __name__ == '__main__':
         settings.CIFAR100_TRAIN_MEAN,
         settings.CIFAR100_TRAIN_STD,
         num_workers=4,
-        batch_size=args.b,
+        batch_size=args.b if args.net != 'inceptionv3' else 64,  #Batch_size过大会导致超过GPU的内存,
         shuffle=True
     )
 
@@ -161,16 +161,16 @@ if __name__ == '__main__':
     elif args.mre:
         mode = 'mre'
     elif args.modeltest:
-        mode = 'breath_model'
+        mode = 'modelbreath'
     else:
         mode = ''
 
     if args.resume:
-        recent_folder = most_recent_folder(os.path.join(settings.CHECKPOINT_PATH, args.net), fmt=settings.DATE_FORMAT)
+        recent_folder = most_recent_folder(os.path.join(settings.CHECKPOINT_PATH, args.net, mode), fmt=settings.DATE_FORMAT)
         if not recent_folder:
             raise Exception('no recent folder were found')
 
-        checkpoint_path = (os.path.join(settings.CHECKPOINT_PATH, args.net, mode, recent_folder))
+        checkpoint_path = (os.path.join(settings.CHECKPOINT_PATH, args.net, recent_folder))
 
     else:
         checkpoint_path = (os.path.join(settings.CHECKPOINT_PATH, args.net, mode, settings.TIME_NOW))
@@ -232,11 +232,14 @@ if __name__ == '__main__':
             print('saving weights file to {}'.format(weights_path))
             torch.save(net.state_dict(), weights_path)
             best_acc = acc
+            print(f'The best_acc is {best_acc}')
+            print()
             continue
 
         if not epoch % settings.SAVE_EPOCH:
             weights_path = checkpoint_path.format(net=args.net, epoch=epoch, type='regular')
             print('saving weights file to {}'.format(weights_path))
+            print(f'The best_acc is {best_acc}')
             torch.save(net.state_dict(), weights_path)
 
     writer.close()

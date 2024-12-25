@@ -1,0 +1,16 @@
+#vgg16 in breath_model
+Evaluating Network.....
+Test set: Epoch: 100, Average loss: 0.0108, Accuracy: 0.2979, Time consumed:14.39s
+
+saving weights file to checkpoint\vgg16\breath_model\Thursday_31_October_2024_14h_55m_28s\vgg16-100-regular.pth
+
+Evaluating Network.....
+Test set: Epoch: 100, Average loss: 0.0110, Accuracy: 0.2851, Time consumed:13.00s
+
+saving weights file to checkpoint\vgg16\breath_model\Thursday_31_October_2024_22h_07m_51s\vgg16-100-regular.pth
+
+#vgg16 normal
+Evaluating Network.....
+Test set: Epoch: 100, Average loss: 0.0063, Accuracy: 0.6506, Time consumed:13.53s
+
+saving weights file to checkpoint\vgg16\Friday_01_November_2024_11h_33m_30s\vgg16-100-regular.pth

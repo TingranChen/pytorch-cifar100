@@ -10,6 +10,37 @@
 
 import torch
 import torch.nn as nn
+import pandas as pd
+import utils_mine.DelayExpansion as DEX  # 假设你有这个模块
+
+# ... 其他代码 ...
+
+class DelayExpansionConv2d(nn.Conv2d):
+    def __init__(self, delay_layer, in_channels, out_channels, kernel_size, stride=1,
+                 padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros'):
+        super(DelayExpansionConv2d, self).__init__(
+            in_channels, out_channels, kernel_size, stride, padding, dilation,
+            groups, bias, padding_mode)
+        self.delay_layer = delay_layer
+
+    def forward(self, input):
+        output = super(DelayExpansionConv2d, self).forward(input)
+        batch_size = output.size(0)
+        assert output.dim() == 4
+        self.delay_layer(output, batch_size, self)
+        return output
+
+class DelayExpansionLinear(nn.Linear):
+    def __init__(self, delay_layer, in_features, out_features, bias=True):
+        super(DelayExpansionLinear, self).__init__(in_features, out_features, bias)
+        self.delay_layer = delay_layer
+
+    def forward(self, input):
+        output = super(DelayExpansionLinear, self).forward(input)
+        batch_size = output.size(0)
+        assert output.dim() == 2
+        self.delay_layer(output, batch_size, self)
+        return output
 
 class BasicBlock(nn.Module):
     """Basic Block for resnet 18 and resnet 34
@@ -22,15 +53,15 @@ class BasicBlock(nn.Module):
     #to distinct
     expansion = 1
 
-    def __init__(self, in_channels, out_channels, stride=1):
+    def __init__(self, delay_layer, in_channels, out_channels, stride=1):
         super().__init__()
 
         #residual function
         self.residual_function = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False),
+            DelayExpansionConv2d(delay_layer, in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels * BasicBlock.expansion, kernel_size=3, padding=1, bias=False),
+            DelayExpansionConv2d(delay_layer, out_channels, out_channels * BasicBlock.expansion, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels * BasicBlock.expansion)
         )
 
@@ -41,7 +72,7 @@ class BasicBlock(nn.Module):
         #use 1*1 convolution to match the dimension
         if stride != 1 or in_channels != BasicBlock.expansion * out_channels:
             self.shortcut = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels * BasicBlock.expansion, kernel_size=1, stride=stride, bias=False),
+                DelayExpansionConv2d(delay_layer, in_channels, out_channels * BasicBlock.expansion, kernel_size=1, stride=stride, bias=False),
                 nn.BatchNorm2d(out_channels * BasicBlock.expansion)
             )
 
@@ -53,16 +84,16 @@ class BottleNeck(nn.Module):
 
     """
     expansion = 4
-    def __init__(self, in_channels, out_channels, stride=1):
+    def __init__(self, delay_layer, in_channels, out_channels, stride=1):
         super().__init__()
         self.residual_function = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
+            DelayExpansionConv2d(delay_layer, in_channels, out_channels, kernel_size=1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, stride=stride, kernel_size=3, padding=1, bias=False),
+            DelayExpansionConv2d(delay_layer, out_channels, out_channels, stride=stride, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels * BottleNeck.expansion, kernel_size=1, bias=False),
+            DelayExpansionConv2d(delay_layer, out_channels, out_channels * BottleNeck.expansion, kernel_size=1, bias=False),
             nn.BatchNorm2d(out_channels * BottleNeck.expansion),
         )
 
@@ -70,7 +101,7 @@ class BottleNeck(nn.Module):
 
         if stride != 1 or in_channels != out_channels * BottleNeck.expansion:
             self.shortcut = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels * BottleNeck.expansion, stride=stride, kernel_size=1, bias=False),
+                DelayExpansionConv2d(delay_layer, in_channels, out_channels * BottleNeck.expansion, stride=stride, kernel_size=1, bias=False),
                 nn.BatchNorm2d(out_channels * BottleNeck.expansion)
             )
 
@@ -79,25 +110,26 @@ class BottleNeck(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, block, num_block, num_classes=100):
+    def __init__(self, delay_data, block, num_block, num_classes=100):
         super().__init__()
 
         self.in_channels = 64
+        self.delay_layer = DEX.DelayExpansionLayer(delay_data)
 
         self.conv1 = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size=3, padding=1, bias=False),
+            DelayExpansionConv2d(self.delay_layer, 3, 64, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True))
         #we use a different inputsize than the original paper
         #so conv2_x's stride is 1
-        self.conv2_x = self._make_layer(block, 64, num_block[0], 1)
-        self.conv3_x = self._make_layer(block, 128, num_block[1], 2)
-        self.conv4_x = self._make_layer(block, 256, num_block[2], 2)
-        self.conv5_x = self._make_layer(block, 512, num_block[3], 2)
+        self.conv2_x = self._make_layer(block, self.delay_layer, 64, num_block[0], 1)
+        self.conv3_x = self._make_layer(block, self.delay_layer, 128, num_block[1], 2)
+        self.conv4_x = self._make_layer(block, self.delay_layer, 256, num_block[2], 2)
+        self.conv5_x = self._make_layer(block, self.delay_layer, 512, num_block[3], 2)
         self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
+        self.fc = DelayExpansionLinear(self.delay_layer, 512 * block.expansion, num_classes)
 
-    def _make_layer(self, block, out_channels, num_blocks, stride):
+    def _make_layer(self, block, delay_layer, out_channels, num_blocks, stride):
         """make resnet layers(by layer i didnt mean this 'layer' was the
         same as a neuron netowork layer, ex. conv layer), one layer may
         contain more than one residual block
@@ -117,7 +149,7 @@ class ResNet(nn.Module):
         strides = [stride] + [1] * (num_blocks - 1)
         layers = []
         for stride in strides:
-            layers.append(block(self.in_channels, out_channels, stride))
+            layers.append(block(delay_layer, self.in_channels, out_channels, stride))
             self.in_channels = out_channels * block.expansion
 
         return nn.Sequential(*layers)
@@ -134,27 +166,48 @@ class ResNet(nn.Module):
 
         return output
 
+
+data = [
+    [0.0, 0.056598642],
+    [0.0666667, 0.205962435],
+    [0.1333333, 0.312138982],
+    [0.2, 0.437158198],
+    [0.2666667, 0.319973934],
+    [0.3333333, 0.450264408],
+    [0.4, 0.559485637],
+    [0.4666667, 0.694916383],
+    [0.5333333, 0.562896787],
+    [0.6, 0.709107365],
+    [0.6666667, 0.811728286],
+    [0.7333333, 0.939352112],
+    [0.8, 0.818508719],
+    [0.8666667, 0.958645411],
+    [0.9333333, 1.072683293],
+    [1.0, 1.192973781]
+]
+# 将数据转换为 DataFrame
+delay_data = pd.DataFrame(data, columns=["data", "delay expension"])
 def resnet18():
     """ return a ResNet 18 object
     """
-    return ResNet(BasicBlock, [2, 2, 2, 2])
+    return ResNet(delay_data, BasicBlock,[2, 2, 2, 2])
 
 def resnet34():
     """ return a ResNet 34 object
     """
-    return ResNet(BasicBlock, [3, 4, 6, 3])
+    return ResNet(delay_data, BasicBlock, [3, 4, 6, 3])
 
 def resnet50():
     """ return a ResNet 50 object
     """
-    return ResNet(BottleNeck, [3, 4, 6, 3])
+    return ResNet(delay_data, BottleNeck, [3, 4, 6, 3])
 
 def resnet101():
     """ return a ResNet 101 object
     """
-    return ResNet(BottleNeck, [3, 4, 23, 3])
+    return ResNet(delay_data, BottleNeck, [3, 4, 23, 3])
 
 def resnet152():
     """ return a ResNet 152 object
     """
-    return ResNet(BottleNeck, [3, 8, 36, 3])
+    return ResNet(delay_data, BottleNeck, [3, 8, 36, 3])

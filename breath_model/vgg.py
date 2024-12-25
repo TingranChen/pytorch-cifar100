@@ -32,16 +32,16 @@ class BreathConv2d(nn.Module):
         self.breath = nn.Sequential(
             # SuperCIM1
             nn.Conv2d(in_channels=in_channels, out_channels=self.tmp_in_cores*PI, kernel_size=1, stride=stride, padding=0),
-            nn.BatchNorm2d(self.tmp_in_cores*PI),
-            nn.ReLU(inplace=True),
+            #nn.BatchNorm2d(self.tmp_in_cores*PI),
+            #nn.ReLU(inplace=True),
 
             #SuperCIM2
-            nn.Conv2d(in_channels=self.tmp_in_cores*PI, out_channels=self.tmp_out_cores*PO, kernel_size=kernel_size, stride=stride, padding=padding),
-            nn.BatchNorm2d(self.tmp_out_cores*PO),
-            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels=self.tmp_in_cores*PI, out_channels=self.tmp_out_cores*PO, kernel_size=kernel_size, stride=stride, padding=padding, groups=self.tmp_out_cores),
+            #nn.BatchNorm2d(self.tmp_out_cores*PO),
+            #nn.ReLU(inplace=True),
 
             #SuperCIM3
-            nn.Conv2d(in_channels=self.tmp_out_cores*PO, out_channels=out_channels, kernel_size=1, stride=stride, padding=0, groups=self.tmp_out_cores),
+            nn.Conv2d(in_channels=self.tmp_out_cores*PO, out_channels=out_channels, kernel_size=1, stride=stride, padding=0),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
         )
@@ -65,17 +65,17 @@ class VGG(nn.Module):
         self.branchA1 = BreathConv2d(in_channels=3, out_channels=64, tmp_in_cores=1, tmp_out_cores=1, kernel_size=3, stride=1, padding=1)
         self.branchA2 = BreathConv2d(in_channels=64, out_channels=64, tmp_in_cores=1, tmp_out_cores=1, kernel_size=3, stride=1, padding=1)
 
-        self.branchB1 = BreathConv2d(in_channels=64, out_channels=128, tmp_in_cores=1, tmp_out_cores=1, kernel_size=3, stride=1, padding=1)
-        self.branchB2 = BreathConv2d(in_channels=128, out_channels=128, tmp_in_cores=1, tmp_out_cores=1, kernel_size=3, stride=1, padding=1)
+        self.branchB1 = BreathConv2d(in_channels=64, out_channels=128, tmp_in_cores=1, tmp_out_cores=2, kernel_size=3, stride=1, padding=1)
+        self.branchB2 = BreathConv2d(in_channels=128, out_channels=128, tmp_in_cores=1, tmp_out_cores=2, kernel_size=3, stride=1, padding=1)
 
-        self.branchC1 = BreathConv2d(in_channels=128, out_channels=256, tmp_in_cores=1, tmp_out_cores=1, kernel_size=3, stride=1, padding=1)
-        self.branchC2 = BreathConv2d(in_channels=256, out_channels=256, tmp_in_cores=1, tmp_out_cores=1, kernel_size=3, stride=1, padding=1)
+        self.branchC1 = BreathConv2d(in_channels=128, out_channels=256, tmp_in_cores=1, tmp_out_cores=2, kernel_size=3, stride=1, padding=1)
+        self.branchC2 = BreathConv2d(in_channels=256, out_channels=256, tmp_in_cores=1, tmp_out_cores=4, kernel_size=3, stride=1, padding=1)
 
-        self.branchD1 = BreathConv2d(in_channels=256, out_channels=512, tmp_in_cores=1, tmp_out_cores=1, kernel_size=3, stride=1, padding=1)
-        self.branchD2 = BreathConv2d(in_channels=512, out_channels=512, tmp_in_cores=1, tmp_out_cores=1, kernel_size=3, stride=1, padding=1)
+        self.branchD1 = BreathConv2d(in_channels=256, out_channels=512, tmp_in_cores=1, tmp_out_cores=4, kernel_size=3, stride=1, padding=1)
+        self.branchD2 = BreathConv2d(in_channels=512, out_channels=512, tmp_in_cores=1, tmp_out_cores=4, kernel_size=3, stride=1, padding=1)
 
-        self.branchE1 = BreathConv2d(in_channels=512, out_channels=512, tmp_in_cores=1, tmp_out_cores=1, kernel_size=3, stride=1, padding=1)
-        self.branchE2 = BreathConv2d(in_channels=512, out_channels=512, tmp_in_cores=1, tmp_out_cores=1, kernel_size=3, stride=1, padding=1)
+        self.branchE1 = BreathConv2d(in_channels=512, out_channels=512, tmp_in_cores=1, tmp_out_cores=4, kernel_size=3, stride=1, padding=1)
+        self.branchE2 = BreathConv2d(in_channels=512, out_channels=512, tmp_in_cores=1, tmp_out_cores=8, kernel_size=3, stride=1, padding=1)
 
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
