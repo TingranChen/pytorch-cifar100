@@ -87,14 +87,15 @@ class DelayExpansionLayer(nn.Module):
             kernel_size = layer.kernel_size
             assert channels == out_channels #输出特征图的通道数必然等于算法层的输出通道数
 
-            if batch_size < 16:
-                return layer_output  # 如果batch_size过小，直接返回
+            # if batch_size < 16:
+            #     return layer_output  # 如果batch_size过小，直接返回
 
             delay_matrix = torch.zeros((channels, height, width), device=layer_output.device)
-            for c in range(channels):
-                channel_mean = layer_output[:, c, :, :].mean().item()
-                delay_value = self.get_closest_delay_value(channel_mean)
-                delay_matrix[c, :, :] = delay_value
+            delay_matrix = torch.mean(layer_output.float(), dim=0)
+            for i in range(delay_matrix.shape[0]):
+                for j in range(delay_matrix.shape[1]):
+                    for k in range(delay_matrix.shape[2]):
+                        delay_matrix[i, j, k] = self.get_closest_delay_value(delay_matrix[i, j, k].item())
 
             # delay_matrix = layer_output.mean(dim=0)
 
@@ -119,8 +120,8 @@ class DelayExpansionLayer(nn.Module):
             batch_size, channels = layer_output.shape
             type = "FC"
 
-            if batch_size < 16:
-                return layer_output  # 如果batch_size不是128，直接返回
+            # if batch_size < 16:
+            #     return layer_output  # 如果batch_size不是128，直接返回
 
             in_channels = layer.in_features
             out_channels = layer.out_features
@@ -163,12 +164,16 @@ class DelayExpansionLayer(nn.Module):
         average_matrix_df = pd.DataFrame(average_matrix.detach().cpu().numpy())
 
         # 确认初始路径存在
-        base_dir = "./output/pure_Throughput"
+        if batch_size == 1:
+            base_dir = "./output/trained/single_b"
+        else:
+            base_dir = "./output/trained"
+
         if not os.path.exists(base_dir):
             os.makedirs(base_dir)  # 如果目录不存在则创建
 
         # 定义 Excel 文件路径
-        excel_path = os.path.join(base_dir, "average_matrix_tmp.xlsx")
+        excel_path = os.path.join(base_dir, "delay_matrix_tmp.xlsx")
 
         # 使用 'a' 模式，追加新的子表，不会覆盖已有文件
         with pd.ExcelWriter(excel_path, mode='a', if_sheet_exists='new') as writer:

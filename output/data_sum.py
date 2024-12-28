@@ -3,9 +3,9 @@ import pandas as pd
 net = 'mobile'
 
 # 定义 Excel 文件的路径
-#excel_path = "./average_matrix_vgg.xlsx"  # 请确保路径正确
-#excel_path = "./average_matrix_mobilenet.xlsx"  # 请确保路径正确
-excel_path = "./average_matrix_inception.xlsx"  # 请确保路径正确
+#excel_path = "./average_matrix_vgg16.xlsx"  # 请确保路径正确
+#excel_path = "./average_matrix_mobilenetv2.xlsx"  # 请确保路径正确
+excel_path = "./average_matrix_inceptionv3.xlsx"  # 请确保路径正确
 
 # 打开 Excel 文件并读取所有子表的数据
 excel_data = pd.ExcelFile(excel_path)

@@ -69,7 +69,7 @@ class VGG(nn.Module):
             DelayExpansionLinear(self.delay_layer, 4096, 4096),
             nn.ReLU(inplace=True),
             nn.Dropout(),
-            nn.Linear(4096, num_classes)
+            DelayExpansionLinear(self.delay_layer, 4096, num_classes)
         )
 
     def forward(self, x):

@@ -181,17 +181,17 @@ class StochasticDepthResNet(nn.Module):
 
         return output
 
-def stochastic_depth_resnet18(num_classes=10):
+def stochastic_depth_resnet18(num_classes=100):
     return StochasticDepthResNet(StochasticDepthBasicBlock, [2, 2, 2, 2], num_classes)
 
-def stochastic_depth_resnet34(num_classes=10):
+def stochastic_depth_resnet34(num_classes=100):
     return StochasticDepthResNet(StochasticDepthBasicBlock, [3, 4, 6, 3], num_classes)
 
-def stochastic_depth_resnet50(num_classes=10):
+def stochastic_depth_resnet50(num_classes=100):
     return StochasticDepthResNet(StochasticDepthBottleNeck, [3, 4, 6, 3], num_classes)
 
-def stochastic_depth_resnet101(num_classes=10):
+def stochastic_depth_resnet101(num_classes=100):
     return StochasticDepthResNet(StochasticDepthBottleNeck, [3, 4, 23, 3], num_classes)
 
-def stochastic_depth_resnet152(num_classes=10):
+def stochastic_depth_resnet152(num_classes=100):
     return StochasticDepthResNet(StochasticDepthBottleNeck, [3, 8, 36, 3], num_classes)

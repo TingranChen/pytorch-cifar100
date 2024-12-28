@@ -45,7 +45,7 @@ def get_network(args):
             from models_throughput.inceptionv3 import inceptionv3
             net = inceptionv3()
         elif args.net == 'shufflenetv2':
-            from models_throughput.shufflenetv2 import shufflenetv2
+            from models_throughput.shufflenetv2_trained import shufflenetv2
             net = shufflenetv2()
         elif args.net == 'densenet121':
             from models_throughput.densenet import densenet121
@@ -84,7 +84,7 @@ def get_network(args):
             from models_throughput.squeezenet import squeezenet
             net = squeezenet()
         elif args.net == 'xception':
-            from models_throughput.xception import xception
+            from models_throughput.xception_trained import xception
             net = xception()
         elif args.net == 'stochasticdepth18':
             from models_throughput.stochasticdepth import stochastic_depth_resnet18
