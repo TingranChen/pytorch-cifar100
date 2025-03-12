@@ -173,7 +173,7 @@ class DelayExpansionLayer(nn.Module):
             os.makedirs(base_dir)  # 如果目录不存在则创建
 
         # 定义 Excel 文件路径
-        excel_path = os.path.join(base_dir, "delay_matrix_tmp.xlsx")
+        excel_path = os.path.join(base_dir, "single_matrix_tmp.xlsx")
 
         # 使用 'a' 模式，追加新的子表，不会覆盖已有文件
         with pd.ExcelWriter(excel_path, mode='a', if_sheet_exists='new') as writer:
