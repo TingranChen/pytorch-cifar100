@@ -12,7 +12,6 @@ import torch
 import torch.nn as nn
 import pandas as pd
 import utils_mine.DelayCalculation as DEC  # 假设你有这个模块
-import utils_mine.DelayCalculation as DEX  # 假设你有这个模块
 
 # ... 其他代码 ...
 
@@ -25,10 +24,10 @@ class DelayCalculationConv2d(nn.Conv2d):
         self.delay_layer = delay_layer
 
     def forward(self, input):
-        output = super(DelayCalculationConv2d, self).forward(input)
+        output = super(DelayCalculationConv2d, self).forward(input)  # output = Conv2d.forward(input)
         batch_size = output.size(0)
         assert output.dim() == 4
-        self.delay_layer(output, batch_size, self)
+        self.delay_layer(input, batch_size, self)  # Conv2d(input)
         return output
 
 class DelayCalculationLinear(nn.Linear):

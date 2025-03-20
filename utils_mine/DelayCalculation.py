@@ -13,7 +13,7 @@ class DelayCalculationLayer(nn.Module):
         self.cinUnit = 128 # 一个Core的MAC计算的输入通道
         self.coutUnit = 16 # 一个Core的MAC计算的输出通道
         self.latency = 4 # core的计算延时 (CLK)
-        self.bandwidth = 128 # 输入带 (bit/CLK)
+        self.bandwidth = 128 # 输入带宽 (bit/CLK)
         self.precision = 4 # 数据精度(bit)
         self.clk_period = 10 # 时钟周期 (ns)
 
@@ -77,11 +77,12 @@ class DelayCalculationLayer(nn.Module):
             in_channels = layer.in_channels #layer 是算法层
             out_channels = layer.out_channels
             kernel_size = layer.kernel_size
-            assert channels == out_channels #输出特征图的通道数必然等于算法层的输出通道数
+            stride = layer.stride
+            assert channels == in_channels #输入特征图的通道数必然等于算法层的输出通道数
 
             #计算fixed rowxcol情况下的计算延时
             #总共有多少次MAC计算
-            compute_repeat = in_channels * out_channels * kernel_size[0] * kernel_size[1] * height * width
+            compute_repeat = in_channels * out_channels * kernel_size[0] * kernel_size[1] * height * width / stride[0] / stride[1]
             if in_channels <= self.cinUnit * self.row : #卷积输入通道数小于CIM阵列的计算输入并行度
                 compute_repeat /= in_channels
                 row_size = math.ceil(in_channels/self.cinUnit)
@@ -93,17 +94,28 @@ class DelayCalculationLayer(nn.Module):
 
             if out_channels <= self.coutUnit * self.col : #卷积输出通道数小于CIM阵列的计算输出并行度
                 compute_repeat /= out_channels
+                col_size = math.ceil(out_channels/self.coutUnit)
             else :  #卷积输入通道数大于CIM阵列的计算输入并行度
                 repeat_times_out = math.ceil(out_channels / (self.coutUnit * self.col))
                 equal_cout = math.ceil(out_channels/ repeat_times_out)#计算归一化计算并行度
                 compute_repeat /= equal_cout
+                col_size = self.col
 
-            #每次MAC计算耗费的时间（CLK）
-            datatransfer_time = row_size * self.cinUnit * self.precision / self.bandwidth
-            mac_time = max(datatransfer_time, self.latency)
-            #计算MAC计算总的时间
-            mac_time_fixed = mac_time * compute_repeat * self.clk_period
-            #print(f"Total compute Repeat is {compute_repeat} for each delay_matrix element of this layer")
+            # 每次数据输入耗费的时间（CLK）
+            data_transfer_in_time_unit = row_size * self.cinUnit * self.precision / self.bandwidth
+            # 每次结果输出耗费的时间（CLK）
+            data_transfer_out_time_unit = col_size * self.coutUnit * self.precision / self.bandwidth
+            # 每次MAC计算耗费的时间（CLK）
+            mac_time_unit = self.latency
+
+            # 数据输入总的时间
+            data_transfer_in_time_fixed = data_transfer_in_time_unit * compute_repeat * self.clk_period
+            # 结果输出总的时间
+            data_transfer_out_time_fixed = data_transfer_out_time_unit * compute_repeat * self.clk_period
+            # 计算MAC计算总的时间
+            mac_time_fixed = mac_time_unit * compute_repeat * self.clk_period
+            # 权重更新总的时间
+            # weight_update_time_fixed = mac_time_unit * compute_repeat * self.clk_period
 
             #计算dynamic rowxcol情况下的计算延时(优先满足输入并行度)
             #总共有多少次MAC计算
@@ -133,6 +145,21 @@ class DelayCalculationLayer(nn.Module):
                 # equal_pix = kernel_size[0]*kernel_size[1] / repeat_times_pix  #计算归一化计算并行度
                 compute_repeat /= repeat_times_pix
 
+            # 每次数据输入耗费的时间（CLK）
+            data_transfer_in_time_unit = math.ceil(repeat_times_pix * row_size * self.cinUnit * self.precision / self.bandwidth)
+            # 每次结果输出耗费的时间（CLK）
+            data_transfer_out_time_unit = math.ceil(col_size * self.coutUnit * self.precision / self.bandwidth)
+            # 每次MAC计算耗费的时间（CLK）
+            mac_time_unit = self.latency
+
+            # 数据输入总的时间
+            data_transfer_in_time_dynamic = data_transfer_in_time_unit * compute_repeat * self.clk_period
+            # 结果输出总的时间
+            data_transfer_out_time_dynamic = data_transfer_out_time_unit * compute_repeat * self.clk_period
+            # 计算MAC计算总的时间
+            mac_time_dynamic = mac_time_unit * compute_repeat * self.clk_period
+
+
             #每次MAC计算耗费的时间（CLK）
             datatransfer_time = math.ceil(repeat_times_pix * row_size * self.cinUnit * self.precision / self.bandwidth)
             mac_time = max(datatransfer_time, self.latency)
@@ -140,7 +167,7 @@ class DelayCalculationLayer(nn.Module):
             mac_time_dynamic = mac_time * compute_repeat * self.clk_period
             #print(f"Total compute Repeat is {compute_repeat} for each delay_matrix element of this layer")
 
-            print(f"{height} {width} {in_channels} {out_channels} {repeat_times_pix} {mac_time} {row_size} {col_size} {mac_time_fixed} {mac_time_dynamic}")
+            print(f"{height} {width} {in_channels} {out_channels} {repeat_times_pix} {mac_time} {row_size} {col_size} {mac_time_fixed} {data_transfer_in_time_fixed} {data_transfer_out_time_fixed} {mac_time_dynamic} {data_transfer_out_time_dynamic} {data_transfer_out_time_dynamic}")
 
         elif layer_output.dim() == 2:
             batch_size, channels = layer_output.shape
