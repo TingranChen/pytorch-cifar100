@@ -13,8 +13,9 @@ class DelayCalculationLayer(nn.Module):
         self.cinUnit = 128 # 一个Core的MAC计算的输入通道
         self.coutUnit = 16 # 一个Core的MAC计算的输出通道
         self.latency = 4 # core的计算延时 (CLK)
-        self.bandwidth = 128 # 输入带宽 (bit/CLK)
+        self.bandwidth = 256 # 输入带宽 (bit/CLK)
         self.precision = 4 # 数据精度(bit)
+        self.paral_pix = 256 # 像素并行度（用于容纳乒乓权重更新带来的事件开销）
         self.clk_period = 10 # 时钟周期 (ns)
 
    def find_optimal_rectangle_dimensions(self, length_unit, width_unit, core_number, input_channel, output_channel):
@@ -114,8 +115,17 @@ class DelayCalculationLayer(nn.Module):
             data_transfer_out_time_fixed = data_transfer_out_time_unit * compute_repeat * self.clk_period
             # 计算MAC计算总的时间
             mac_time_fixed = mac_time_unit * compute_repeat * self.clk_period
-            # 权重更新总的时间
-            # weight_update_time_fixed = mac_time_unit * compute_repeat * self.clk_period
+
+            #计算权重更新的时间开销
+            weight_update_time_cores = row_size * col_size * self.cinUnit * self.coutUnit * self.precision / self.bandwidth #当前多核结构内全部权重数据更新花费的CLK数
+            weight_updata_repeat_unit = math.ceil(in_channels * out_channels * kernel_size[0] * kernel_size[1] / row_size / col_size /self.cinUnit / self.coutUnit) #要完成paral_pix个像素的卷积，多核架构上权重的刷新次数（全局的）
+            mac_repeat_per_weight_update = math.ceil(weight_update_time_cores / self.latency) # 要能够实现乒乓，要在一次权重刷新中实现的mac运算的最少次数
+            assert self.paral_pix > mac_repeat_per_weight_update # 设定的像素并行度参数必须大于由其它参数计算得到的最少次数,否则无法实现乒乓
+            if self.paral_pix > height*width :
+                paral_pix = height*width
+            else:
+                paral_pix = self.paral_pix
+            weight_time_fixed = math.ceil(height * width / paral_pix * weight_updata_repeat_unit * weight_update_time_cores * self.clk_period) #整个卷积层上执行全部计算所需的权重写入时间
 
             #计算dynamic rowxcol情况下的计算延时(优先满足输入并行度)
             #总共有多少次MAC计算
@@ -159,15 +169,18 @@ class DelayCalculationLayer(nn.Module):
             # 计算MAC计算总的时间
             mac_time_dynamic = mac_time_unit * compute_repeat * self.clk_period
 
+            #计算权重更新总的时间
+            weight_update_time_cores = row_size * col_size * self.cinUnit * self.coutUnit * self.precision / self.bandwidth #当前多核结构内全部权重数据更新花费的CLK数
+            weight_updata_repeat_unit = math.ceil(in_channels * out_channels * kernel_size[0] * kernel_size[1] / math.ceil(self.row * self.col / (row_size*col_size)) / row_size / col_size /self.cinUnit / self.coutUnit) #要完成paral_pix个像素的卷积，多核架构上权重的刷新次数（全局的）
+            mac_repeat_per_weight_update = math.ceil(weight_update_time_cores / self.latency) # 要能够实现乒乓，要在一次权重刷新中实现的mac运算的最少次数
+            assert self.paral_pix > mac_repeat_per_weight_update # 设定的像素并行度参数必须大于由其它参数计算得到的最少次数,否则无法实现乒乓
+            if self.paral_pix > height*width :
+                paral_pix = height*width
+            else:
+                paral_pix = self.paral_pix
+            weight_time_dynamic = math.ceil(height * width / paral_pix * weight_updata_repeat_unit * weight_update_time_cores * self.clk_period) #整个卷积层上执行全部计算所需的权重写入时间
 
-            #每次MAC计算耗费的时间（CLK）
-            datatransfer_time = math.ceil(repeat_times_pix * row_size * self.cinUnit * self.precision / self.bandwidth)
-            mac_time = max(datatransfer_time, self.latency)
-            #计算MAC计算总的时间
-            mac_time_dynamic = mac_time * compute_repeat * self.clk_period
-            #print(f"Total compute Repeat is {compute_repeat} for each delay_matrix element of this layer")
-
-            print(f"{height} {width} {in_channels} {out_channels} {repeat_times_pix} {mac_time} {row_size} {col_size} {mac_time_fixed} {data_transfer_in_time_fixed} {data_transfer_out_time_fixed} {mac_time_dynamic} {data_transfer_out_time_dynamic} {data_transfer_out_time_dynamic}")
+            print(f"{height} {width} {in_channels} {out_channels} {repeat_times_pix} {max(mac_time_unit,data_transfer_in_time_unit,data_transfer_out_time_unit)} {row_size} {col_size} {data_transfer_in_time_fixed} {mac_time_fixed} {data_transfer_out_time_fixed} {weight_time_fixed} {data_transfer_in_time_dynamic} {mac_time_dynamic} {data_transfer_out_time_dynamic} {weight_time_dynamic}")
 
         elif layer_output.dim() == 2:
             batch_size, channels = layer_output.shape
@@ -193,11 +206,10 @@ class DelayCalculationLayer(nn.Module):
                 equal_cout = math.ceil(out_channels/ repeat_times_out)#计算归一化计算并行度
                 compute_repeat /= equal_cout * self.col
 
-            # 每次MAC计算耗费的时间（CLK）
-            datatransfer_time = self.row * self.cinUnit * self.precision / self.bandwidth
-            mac_time = max(datatransfer_time, self.latency)
             # 计算MAC计算总的时间
-            mac_time_fixed = mac_time * compute_repeat * self.clk_period
+            mac_time_fixed = self.latency * compute_repeat * self.clk_period
+            # 计算数据传输总的时间
+            datatransfer_time = self.row * self.cinUnit * self.precision / self.bandwidth * compute_repeat * self.latency
 
 
             # 计算dynamic rowxcol情况下的计算延时(优先满足输入并行度)
@@ -226,7 +238,7 @@ class DelayCalculationLayer(nn.Module):
             mac_time_dynamic = mac_time * compute_repeat * self.clk_period
             # print(f"Total compute Repeat is {compute_repeat} for each delay_matrix element of this layer")
 
-            print(f"- - {in_channels} {out_channels} - {mac_time} {row_size} {col_size} {mac_time_fixed} {mac_time_dynamic}")
+            print(f"- - {in_channels} {out_channels} - {mac_time} {row_size} {col_size} 0 {mac_time_fixed} 0 2048 0 {mac_time_dynamic} 0 5096")
 
         else:
             print(f"Not a PyTorch Layer!")
