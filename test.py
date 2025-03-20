@@ -23,13 +23,14 @@ from utils import get_network, get_test_dataloader
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-net', type=str, default='attention56', help='net type')
-    parser.add_argument('-weights', type=str, default='./checkpoint/vgg16/Tuesday_24_December_2024_14h_33m_41s/vgg16-47-best.pth', help='the weights file you want to test')
+    parser.add_argument('-net', type=str, default='resnet34', help='net type')
+    parser.add_argument('-weights', type=str, default='./checkpoint/resnet34/Wednesday_25_December_2024_03h_27m_03s/resnet34-92-best.pth', help='the weights file you want to test')
     parser.add_argument('-gpu', action='store_true', default=True, help='use gpu or not')
     parser.add_argument('-b', type=int, default=1, help='batch size for dataloader')
     parser.add_argument('-quan', action='store_true', default=False, help='Quantiization Aware')
     parser.add_argument('-mre', action='store_true', default=False, help='MRE Aware')
-    parser.add_argument('-throu', action='store_true', default=True, help='Throughput Exam')
+    parser.add_argument('-throu', action='store_true', default=False, help='Throughput Exam')
+    parser.add_argument('-delay', action='store_true', default=True, help='Throughput Exam')
     parser.add_argument('-modeltest', action='store_true', default=False, help='breath model test')
     args = parser.parse_args()
 
@@ -83,20 +84,20 @@ if __name__ == '__main__':
             elif n_iter == img_list[args.net]:
                 print("iteration: {}\ttotal {} iterations".format(n_iter + 1, len(cifar100_test_loader)))
 
-                if (args.b == 1):
-                    # 获取第一个图像，调整维度顺序，移动到 CPU，转换为 NumPy 数组，并进行归一化
-                    image_to_show = image[0, :, :, :].permute(1, 2, 0).cpu().to(torch.float32)
-
-                    # 或者，如果你的数据已经在 [0, 1] 范围内：
-                    # image_to_show = image[0, :, :, :].permute(1, 2, 0).cpu()
-
-                    # 使用 Matplotlib 显示图像
-                    plt.imshow(image_to_show)
-                    plt.title(f"{n_iter}")
-                    plt.axis('off')
-                    plt.savefig(output_path)
-                    plt.show()
-                    plt.close()  # 关闭图像，释放资源
+                # if (args.b == 1):
+                #     # 获取第一个图像，调整维度顺序，移动到 CPU，转换为 NumPy 数组，并进行归一化
+                #     image_to_show = image[0, :, :, :].permute(1, 2, 0).cpu().to(torch.float32)
+                #
+                #     # 或者，如果你的数据已经在 [0, 1] 范围内：
+                #     # image_to_show = image[0, :, :, :].permute(1, 2, 0).cpu()
+                #
+                #     # 使用 Matplotlib 显示图像
+                #     plt.imshow(image_to_show)
+                #     plt.title(f"{n_iter}")
+                #     plt.axis('off')
+                #     plt.savefig(output_path)
+                #     plt.show()
+                #     plt.close()  # 关闭图像，释放资源
 
                 if args.gpu:
                     image = image.cuda()

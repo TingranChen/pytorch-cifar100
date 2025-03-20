@@ -76,26 +76,22 @@ class DelayExpansionLayer(nn.Module):
         else:
             raise ValueError("Delay matrix must be either 2D or 3D.")
 
-    def forward(self, layer_output, batch, layer):
+    def forward(self, layer_output, batch, in_channels, out_channels, kernel_size):
         """计算每层的膨胀参数矩阵，并保存到Excel文件中。"""
         # 获取输入的形状，并判断是否需要处理
         if layer_output.dim() == 4:
             type = "CONV"
             batch_size, channels, height, width = layer_output.shape #输出特征图尺寸信息
-            in_channels = layer.in_channels #layer 是算法层
-            out_channels = layer.out_channels
-            kernel_size = layer.kernel_size
             assert channels == out_channels #输出特征图的通道数必然等于算法层的输出通道数
 
-            # if batch_size < 16:
-            #     return layer_output  # 如果batch_size过小，直接返回
+            if batch_size < 16:
+                return layer_output  # 如果batch_size过小，直接返回
 
             delay_matrix = torch.zeros((channels, height, width), device=layer_output.device)
-            delay_matrix = torch.mean(layer_output.float(), dim=0)
-            for i in range(delay_matrix.shape[0]):
-                for j in range(delay_matrix.shape[1]):
-                    for k in range(delay_matrix.shape[2]):
-                        delay_matrix[i, j, k] = self.get_closest_delay_value(delay_matrix[i, j, k].item())
+            for c in range(channels):
+                channel_mean = layer_output[:, c, :, :].mean().item()
+                delay_value = self.get_closest_delay_value(channel_mean)
+                delay_matrix[c, :, :] = delay_value
 
             # delay_matrix = layer_output.mean(dim=0)
 
@@ -120,8 +116,8 @@ class DelayExpansionLayer(nn.Module):
             batch_size, channels = layer_output.shape
             type = "FC"
 
-            # if batch_size < 16:
-            #     return layer_output  # 如果batch_size不是128，直接返回
+            if batch_size < 16:
+                return layer_output  # 如果batch_size不是128，直接返回
 
             in_channels = layer.in_features
             out_channels = layer.out_features
@@ -164,19 +160,15 @@ class DelayExpansionLayer(nn.Module):
         average_matrix_df = pd.DataFrame(average_matrix.detach().cpu().numpy())
 
         # 确认初始路径存在
-        if batch_size == 1:
-            base_dir = "./output/trained/single_b"
-        else:
-            base_dir = "./output/trained"
-
+        base_dir = "./output/pure_Throughput"
         if not os.path.exists(base_dir):
-            os.makedirs(base_dir)  # 如果目录不存在则创建
+            os.makedirs(base_dir)
 
         # 定义 Excel 文件路径
-        excel_path = os.path.join(base_dir, "single_matrix_tmp.xlsx")
+        excel_path = os.path.join(base_dir, "average_matrix_tmp.xlsx")
 
-        # 使用 'a' 模式，追加新的子表，不会覆盖已有文件
-        with pd.ExcelWriter(excel_path, mode='a', if_sheet_exists='new') as writer:
+        # 使用 'w' 模式，覆写整个Excel文件
+        with pd.ExcelWriter(excel_path, mode='w', engine='openpyxl') as writer:
             sheet_name = f'{type}_{in_channels}_{out_channels},{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}'
             average_matrix_df.to_excel(writer, sheet_name=sheet_name, index=False, header=False)
 

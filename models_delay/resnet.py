@@ -11,32 +11,33 @@
 import torch
 import torch.nn as nn
 import pandas as pd
-import utils_mine.DelayExpansion as DEX  # 假设你有这个模块
+import utils_mine.DelayCalculation as DEC  # 假设你有这个模块
+import utils_mine.DelayCalculation as DEX  # 假设你有这个模块
 
 # ... 其他代码 ...
 
-class DelayExpansionConv2d(nn.Conv2d):
+class DelayCalculationConv2d(nn.Conv2d):
     def __init__(self, delay_layer, in_channels, out_channels, kernel_size, stride=1,
                  padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros'):
-        super(DelayExpansionConv2d, self).__init__(
+        super(DelayCalculationConv2d, self).__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,
             groups, bias, padding_mode)
         self.delay_layer = delay_layer
 
     def forward(self, input):
-        output = super(DelayExpansionConv2d, self).forward(input)
+        output = super(DelayCalculationConv2d, self).forward(input)
         batch_size = output.size(0)
         assert output.dim() == 4
         self.delay_layer(output, batch_size, self)
         return output
 
-class DelayExpansionLinear(nn.Linear):
+class DelayCalculationLinear(nn.Linear):
     def __init__(self, delay_layer, in_features, out_features, bias=True):
-        super(DelayExpansionLinear, self).__init__(in_features, out_features, bias)
+        super(DelayCalculationLinear, self).__init__(in_features, out_features, bias)
         self.delay_layer = delay_layer
 
     def forward(self, input):
-        output = super(DelayExpansionLinear, self).forward(input)
+        output = super(DelayCalculationLinear, self).forward(input)
         batch_size = output.size(0)
         assert output.dim() == 2
         self.delay_layer(output, batch_size, self)
@@ -58,10 +59,10 @@ class BasicBlock(nn.Module):
 
         #residual function
         self.residual_function = nn.Sequential(
-            DelayExpansionConv2d(delay_layer, in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False),
+            DelayCalculationConv2d(delay_layer, in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            DelayExpansionConv2d(delay_layer, out_channels, out_channels * BasicBlock.expansion, kernel_size=3, padding=1, bias=False),
+            DelayCalculationConv2d(delay_layer, out_channels, out_channels * BasicBlock.expansion, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels * BasicBlock.expansion)
         )
 
@@ -72,7 +73,7 @@ class BasicBlock(nn.Module):
         #use 1*1 convolution to match the dimension
         if stride != 1 or in_channels != BasicBlock.expansion * out_channels:
             self.shortcut = nn.Sequential(
-                DelayExpansionConv2d(delay_layer, in_channels, out_channels * BasicBlock.expansion, kernel_size=1, stride=stride, bias=False),
+                DelayCalculationConv2d(delay_layer, in_channels, out_channels * BasicBlock.expansion, kernel_size=1, stride=stride, bias=False),
                 nn.BatchNorm2d(out_channels * BasicBlock.expansion)
             )
 
@@ -87,13 +88,13 @@ class BottleNeck(nn.Module):
     def __init__(self, delay_layer, in_channels, out_channels, stride=1):
         super().__init__()
         self.residual_function = nn.Sequential(
-            DelayExpansionConv2d(delay_layer, in_channels, out_channels, kernel_size=1, bias=False),
+            DelayCalculationConv2d(delay_layer, in_channels, out_channels, kernel_size=1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            DelayExpansionConv2d(delay_layer, out_channels, out_channels, stride=stride, kernel_size=3, padding=1, bias=False),
+            DelayCalculationConv2d(delay_layer, out_channels, out_channels, stride=stride, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            DelayExpansionConv2d(delay_layer, out_channels, out_channels * BottleNeck.expansion, kernel_size=1, bias=False),
+            DelayCalculationConv2d(delay_layer, out_channels, out_channels * BottleNeck.expansion, kernel_size=1, bias=False),
             nn.BatchNorm2d(out_channels * BottleNeck.expansion),
         )
 
@@ -101,7 +102,7 @@ class BottleNeck(nn.Module):
 
         if stride != 1 or in_channels != out_channels * BottleNeck.expansion:
             self.shortcut = nn.Sequential(
-                DelayExpansionConv2d(delay_layer, in_channels, out_channels * BottleNeck.expansion, stride=stride, kernel_size=1, bias=False),
+                DelayCalculationConv2d(delay_layer, in_channels, out_channels * BottleNeck.expansion, stride=stride, kernel_size=1, bias=False),
                 nn.BatchNorm2d(out_channels * BottleNeck.expansion)
             )
 
@@ -114,10 +115,10 @@ class ResNet(nn.Module):
         super().__init__()
 
         self.in_channels = 64
-        self.delay_layer = DEX.DelayExpansionLayer(delay_data)
+        self.delay_layer = DEC.DelayCalculationLayer()
 
         self.conv1 = nn.Sequential(
-            DelayExpansionConv2d(self.delay_layer, 3, 64, kernel_size=3, padding=1, bias=False),
+            DelayCalculationConv2d(self.delay_layer, 3, 64, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True))
         #we use a different inputsize than the original paper
@@ -127,7 +128,7 @@ class ResNet(nn.Module):
         self.conv4_x = self._make_layer(block, self.delay_layer, 256, num_block[2], 2)
         self.conv5_x = self._make_layer(block, self.delay_layer, 512, num_block[3], 2)
         self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = DelayExpansionLinear(self.delay_layer, 512 * block.expansion, num_classes)
+        self.fc = DelayCalculationLinear(self.delay_layer, 512 * block.expansion, num_classes)
 
     def _make_layer(self, block, delay_layer, out_channels, num_blocks, stride):
         """make resnet layers(by layer i didnt mean this 'layer' was the
