@@ -13,7 +13,7 @@ class DelayCalculationLayer(nn.Module):
         self.cinUnit = 128 # 一个Core的MAC计算的输入通道
         self.coutUnit = 16 # 一个Core的MAC计算的输出通道
         self.latency = 4 # core的计算延时 (CLK)
-        self.bandwidth = 256 # 输入带宽 (bit/CLK)
+        self.bandwidth = 512 # 输入带宽 (bit/CLK)
         self.precision = 4 # 数据精度(bit)
         self.paral_pix = 256 # 像素并行度（用于容纳乒乓权重更新带来的事件开销）
         self.clk_period = 10 # 时钟周期 (ns)
