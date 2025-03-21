@@ -12,11 +12,11 @@ class DelayCalculationLayer(nn.Module):
         self.col = 16 # 多核架构的列数
         self.cinUnit = 128 # 一个Core的MAC计算的输入通道
         self.coutUnit = 16 # 一个Core的MAC计算的输出通道
-        self.latency = 4 # core的计算延时 (CLK)
+        self.latency = 10 # core的计算延时 (CLK)
         self.bandwidth = 512 # 输入带宽 (bit/CLK)
         self.precision = 4 # 数据精度(bit)
         self.paral_pix = 256 # 像素并行度（用于容纳乒乓权重更新带来的事件开销）
-        self.clk_period = 10 # 时钟周期 (ns)
+        self.clk_period = 2 # 时钟周期 (ns)
 
    def find_optimal_rectangle_dimensions(self, length_unit, width_unit, core_number, input_channel, output_channel):
        """
@@ -170,8 +170,8 @@ class DelayCalculationLayer(nn.Module):
             mac_time_dynamic = mac_time_unit * compute_repeat * self.clk_period
 
             #计算权重更新总的时间
-            weight_update_time_cores = row_size * col_size * self.cinUnit * self.coutUnit * self.precision / self.bandwidth #当前多核结构内全部权重数据更新花费的CLK数
-            weight_updata_repeat_unit = math.ceil(in_channels * out_channels * kernel_size[0] * kernel_size[1] / math.ceil(self.row * self.col / (row_size*col_size)) / row_size / col_size /self.cinUnit / self.coutUnit) #要完成paral_pix个像素的卷积，多核架构上权重的刷新次数（全局的）
+            weight_update_time_cores = row_size * col_size * repeat_times_pix * self.cinUnit * self.coutUnit * self.precision / self.bandwidth #当前多核结构内全部权重数据更新花费的CLK数
+            weight_updata_repeat_unit = math.ceil(in_channels * out_channels * kernel_size[0] * kernel_size[1] / repeat_times_pix / row_size / col_size /self.cinUnit / self.coutUnit) #要完成paral_pix个像素的卷积，多核架构上权重的刷新次数（全局的）
             mac_repeat_per_weight_update = math.ceil(weight_update_time_cores / self.latency) # 要能够实现乒乓，要在一次权重刷新中实现的mac运算的最少次数
             assert self.paral_pix > mac_repeat_per_weight_update # 设定的像素并行度参数必须大于由其它参数计算得到的最少次数,否则无法实现乒乓
             if self.paral_pix > height*width :
