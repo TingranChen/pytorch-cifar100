@@ -288,12 +288,6 @@ class DelayCalculationLayer(nn.Module):
            read_delay = (seq_length * input_features) // self.bandwidth * self.clk_period  # 计算所需的时钟周期
 
        # 计算输出的写时钟数
-       if input_features*self.precision < self.bandwidth: # 一个clk可以读完一个
-           read_delay = seq_length * self.clk_period  # 计算所需的时钟周期
-       else:
-           read_delay = (seq_length * input_features) // self.bandwidth * self.clk_period  # 计算所需的时钟周期
-
-       # 计算输出的写时钟数
        if output_features*self.precision < self.bandwidth: # 一个clk可以读完一个
            write_delay = seq_length * self.clk_period  # 计算所需的时钟周期
        else:
