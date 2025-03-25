@@ -17,6 +17,7 @@ class DelayCalculationLayer(nn.Module):
         self.precision = 4 # 数据精度(bit)
         self.paral_pix = 256 # 像素并行度（用于容纳乒乓权重更新带来的事件开销）
         self.clk_period = 2 # 时钟周期 (ns)
+        self.paralSIMD = 16 # SIMD电路的计算并行度 
 
    def find_optimal_rectangle_dimensions(self, length_unit, width_unit, core_number, input_channel, output_channel):
        """
@@ -264,3 +265,144 @@ class DelayCalculationLayer(nn.Module):
         #
         # #print(f"Average matrix of layer {in_channels}&{out_channels} saved to {excel_path} in sheet '{sheet_name}'")
         # return average_matrix
+
+   def rank_transform(self, input_matrix, output_matrix, has_rank_transform):
+       """
+       计算维度转秩的延时数据，适用于 Transformer 网络。
+
+       Args:
+           input_matrix (torch.Tensor): 输入矩阵，二维，形状为 (序列长度, 特征维度)。
+           output_matrix (torch.Tensor): 输出矩阵，二维，形状为 (序列长度, 特征维度)。
+           has_rank_transform (bool): 是否有转秩电路。
+
+       Returns:
+           tuple: 包含延时数据的元组 (read_delay, write_delay)。
+       """
+       seq_length, input_features = input_matrix.size()
+       _, output_features = output_matrix.size()
+
+       # 计算输入的读时钟数
+       if input_features*self.precision < self.bandwidth: # 一个clk可以读完一个
+           read_delay = seq_length * self.clk_period  # 计算所需的时钟周期
+       else:
+           read_delay = (seq_length * input_features) // self.bandwidth * self.clk_period  # 计算所需的时钟周期
+
+       # 计算输出的写时钟数
+       if input_features*self.precision < self.bandwidth: # 一个clk可以读完一个
+           read_delay = seq_length * self.clk_period  # 计算所需的时钟周期
+       else:
+           read_delay = (seq_length * input_features) // self.bandwidth * self.clk_period  # 计算所需的时钟周期
+
+       # 计算输出的写时钟数
+       if output_features*self.precision < self.bandwidth: # 一个clk可以读完一个
+           write_delay = seq_length * self.clk_period  # 计算所需的时钟周期
+       else:
+           write_delay = (seq_length * output_features) // self.bandwidth * self.clk_period  # 计算所需的时钟周期
+
+
+       # 如果有转秩电路，可能需要额外的延时
+       if has_rank_transform:
+           read_delay = int(read_delay / self.coutUnit)  # 假设转秩电路增加50%的延时
+           write_delay = int(write_delay / self.cinUnit)  # 假设转秩电路增加50%的延时
+
+       print(f"{input_features} {output_features} {read_delay} {write_delay}")
+       
+       return read_delay, write_delay
+    
+   def pooling_branch(self, pooling_layer, input_matrix, output_matrix, has_topk):
+        """
+        计算池化分支的延时数据。
+        """
+        batch_size, input_channels, input_height, input_width = input_matrix.size()
+        _, output_channels, output_height, output_width = output_matrix.size()
+
+        # 计算池化运算的运算总量
+        if isinstance(pooling_layer, nn.MaxPool2d) or isinstance(pooling_layer, nn.AvgPool2d):
+            kernel_size = pooling_layer.kernel_size
+            stride = pooling_layer.stride if pooling_layer.stride is not None else kernel_size
+            output_height = (input_height - kernel_size) // stride + 1
+            output_width = (input_width - kernel_size) // stride + 1
+            total_operations = output_channels * output_height * output_width * (kernel_size ** 2)  # 每个输出位置的运算量
+
+        elif isinstance(pooling_layer, nn.AdaptiveAvgPool2d):
+            # 对于 AdaptiveAvgPool2d，输出大小通常为 (1, 1)
+            output_height, output_width = output_matrix.size()[2:]
+            # 假设每个输出位置需要计算整个输入区域的平均值
+            kernel_size = (input_height // output_height, input_width // output_width)
+            total_operations = output_channels * output_height * output_width * (kernel_size[0] * kernel_size[1])  # 每个输出位置的运算量
+
+        else:
+            raise ValueError("Unsupported pooling layer type.")
+
+        # 计算延时
+        parallelism  = self.paralSIMD
+        total_delay = total_operations // parallelism  # 计算所需的时钟周期
+        if total_operations % parallelism != 0:
+            total_delay += 1  # 如果有余数，增加一个时钟周期
+
+        # 根据是否有 TOPk 操作调整延时
+        if has_topk and isinstance(pooling_layer, nn.MaxPool2d):
+            topk_delay = total_delay // min(self.cinUnit, input_channels) // min(kernel_size, output_channels) * self.clk_period  # 根据新逻辑计算 TOPk 延时
+        else:
+            topk_delay = total_delay * self.clk_period  # 非 TOPk 的延时与总延时相同
+
+        non_topk_delay = total_delay * self.clk_period  # 非 TOPk 的延时与总延时相同
+
+        print(f"{input_channels} {output_channels} {topk_delay} {non_topk_delay}")
+
+        return topk_delay, non_topk_delay
+
+   def activation_branch(self, activation_layer, input_matrix):
+        """
+        计算激活函数分支的延时数据。
+
+        Args:
+            activation_layer (nn.Module): 激活函数层（ReLU 或 Softmax）。
+            input_matrix (torch.Tensor): 输入矩阵（FC二维或CNN三维）。
+            output_matrix (torch.Tensor): 输出矩阵（FC二维或CNN三维）。
+            parallelism (int): 计算并行度。
+
+        Returns:
+            tuple: 包含延时数据的元组 (relu_delay, softmax_delay)。
+                  其中 softmax_delay 包含两种情况：全部计算分支或TOPk分支的延时。
+        """
+        # 获取输入矩阵的形状和计算数据总量
+        if input_matrix.dim() == 2:  # FC 层，二维
+            batch_size, features = input_matrix.size()
+            total_elements = features
+        elif input_matrix.dim() == 4:  # CNN 层，四维
+            batch_size, channels, height, width = input_matrix.size()
+            total_elements = channels * height * width
+        else:
+            raise ValueError("Unsupported input matrix dimension")
+
+        # 计算SIMD的并行度
+        parallelism = self.paralSIMD
+
+        # 计算ReLU激活函数运算的延时
+        if isinstance(activation_layer, nn.ReLU):
+            relu_latency = 1  # ReLU计算latency (CLK)
+            relu_delay = (total_elements // parallelism) * relu_latency * self.clk_period
+            if total_elements % parallelism != 0:
+                relu_delay += relu_latency * self.clk_period
+        else:
+            relu_delay = 0
+
+        full_softmax_delay = 0
+        topk_softmax_delay = 0
+        # 计算Softmax激活函数运算的延时
+        if isinstance(activation_layer, nn.Softmax):
+            softmax_latency = 5  # Softmax计算latency (CLK)
+            # 全部计算分支
+            full_softmax_delay = (total_elements // parallelism) * softmax_latency * self.clk_period
+            if total_elements % parallelism != 0:
+                full_softmax_delay += softmax_latency * self.clk_period
+            
+            # TOPk分支（假设k=5）
+            k = 5
+            if k >= parallelism:
+                topk_softmax_delay = math.ceil(k // parallelism) * softmax_latency * self.clk_period
+            else:
+                topk_softmax_delay += (k * total_elements) % parallelism * self.clk_period
+
+        print(f"{input_matrix.size()} {relu_delay} {full_softmax_delay} {topk_softmax_delay}")
