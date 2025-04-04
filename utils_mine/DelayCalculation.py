@@ -167,17 +167,16 @@ class DelayCalculationLayer(nn.Module):
                 compute_repeat /= repeat_times_pix
 
             # 每次数据输入耗费的时间（CLK）
-            data_transfer_in_time_unit = math.ceil(
-                repeat_times_pix * row_size * self.cinUnit * self.precision / self.bandwidth)
+            data_transfer_in_time_unit = repeat_times_pix * row_size * self.cinUnit * self.precision / self.bandwidth
             # 每次结果输出耗费的时间（CLK）
-            data_transfer_out_time_unit = math.ceil(col_size * self.coutUnit * self.precision / self.bandwidth)
+            data_transfer_out_time_unit = col_size * self.coutUnit * self.precision / self.bandwidth
             # 每次MAC计算耗费的时间（CLK）
             mac_time_unit = self.latency
 
             # 数据输入总的时间
-            data_transfer_in_time_dynamic = data_transfer_in_time_unit * compute_repeat * self.clk_period
+            data_transfer_in_time_dynamic = math.ceil(data_transfer_in_time_unit * compute_repeat) * self.clk_period
             # 结果输出总的时间
-            data_transfer_out_time_dynamic = data_transfer_out_time_unit * compute_repeat * self.clk_period
+            data_transfer_out_time_dynamic = math.ceil(data_transfer_out_time_unit * compute_repeat) * self.clk_period
             # 计算MAC计算总的时间
             mac_time_dynamic = mac_time_unit * compute_repeat * self.clk_period
 
@@ -195,7 +194,7 @@ class DelayCalculationLayer(nn.Module):
             weight_time_dynamic = math.ceil(
                 height * width / paral_pix * weight_updata_repeat_unit * weight_update_time_cores * self.clk_period)  # 整个卷积层上执行全部计算所需的权重写入时间
 
-            # print(f"{height} {width} {in_channels} {out_channels} {repeat_times_pix} {max(mac_time_unit,data_transfer_in_time_unit,data_transfer_out_time_unit)} {row_size} {col_size} {data_transfer_in_time_fixed} {mac_time_fixed} {data_transfer_out_time_fixed} {weight_time_fixed} {data_transfer_in_time_dynamic} {mac_time_dynamic} {data_transfer_out_time_dynamic} {weight_time_dynamic}")
+            print(f"Conv: {data_transfer_in_time_fixed} {mac_time_fixed} {data_transfer_out_time_fixed} 0 0 0 0 {data_transfer_in_time_fixed} {mac_time_fixed} {data_transfer_out_time_fixed} 0 0 0 0")
 
         elif layer_output.dim() == 2:
             batch_size, channels = layer_output.shape
@@ -224,7 +223,8 @@ class DelayCalculationLayer(nn.Module):
             # 计算MAC计算总的时间
             mac_time_fixed = self.latency * compute_repeat * self.clk_period
             # 计算数据传输总的时间
-            datatransfer_time = self.row * self.cinUnit * self.precision / self.bandwidth * compute_repeat * self.latency
+            data_transfer_in_time_fixed = self.row * self.cinUnit * self.precision / self.bandwidth * compute_repeat * self.latency
+            data_transfer_out_time_fixed = self.col * self.coutUnit * self.precision / self.bandwidth * compute_repeat * self.latency
 
             # 计算dynamic rowxcol情况下的计算延时(优先满足输入并行度)
             # 总共有多少次MAC计算
@@ -251,10 +251,12 @@ class DelayCalculationLayer(nn.Module):
             datatransfer_time = row_size * self.cinUnit * self.precision / self.bandwidth
             mac_time = max(datatransfer_time, self.latency)
             # 计算MAC计算总的时间
+            data_transfer_in_time_dynamic = row_size * self.cinUnit * self.precision / self.bandwidth * compute_repeat * self.latency
+            data_transfer_out_time_dynamic = col_size * self.coutUnit * self.precision / self.bandwidth * compute_repeat * self.latency
             mac_time_dynamic = mac_time * compute_repeat * self.clk_period
             # print(f"Total compute Repeat is {compute_repeat} for each delay_matrix element of this layer")
 
-            # print(f"- - {in_channels} {out_channels} - {mac_time} {row_size} {col_size} 0 {mac_time_fixed} 0 2048 0 {mac_time_dynamic} 0 5096")
+            print(f"FC: {data_transfer_in_time_fixed} {mac_time_fixed} {data_transfer_out_time_fixed} 0 0 0 0 {data_transfer_in_time_fixed} {mac_time_fixed} {data_transfer_out_time_fixed} 0 0 0 0")
 
         else:
             print(f"Not a PyTorch Layer!")
