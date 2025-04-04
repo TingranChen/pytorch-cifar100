@@ -163,7 +163,7 @@ class ResNet(nn.Module):
         output = self.conv4_x(output)
         output_pooling = self.conv5_x(output)
         output = self.avg_pool(output_pooling)
-        delay_func.pooling_branch(self.avg_pool, output_pooling, output, False)
+        delay_func.pooling_branch(self.avg_pool, output_pooling, output)
         output = output.view(output.size(0), -1)
         output = self.fc(output)
 
